@@ -1,4 +1,4 @@
-<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'><style>:root{color-scheme:light}html,body{margin:0}[hidden]{display:none!important}</style></head><body><title>نمای بازار سرمایه</title>
+<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'><style>html,body{margin:0}[hidden]{display:none!important}</style></head><body><title>نمای بازار سرمایه</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap">
 <style>
 :root{
@@ -85,6 +85,17 @@ button{font:inherit;color:inherit}
 .seg button[aria-pressed="true"]{background:var(--raised); color:var(--ink); font-weight:600}
 .label{font-size:11.5px; color:var(--muted); margin-inline-end:2px}
 
+/* ---- سوییچ نما ---- */
+.seg.views button{padding:7px 15px; font-size:13px; font-weight:500}
+.seg.views button[aria-pressed="true"]{background:var(--ink); color:var(--ground); font-weight:600}
+
+/* ---- راهنمای رنگ ---- */
+.legend{display:flex; gap:14px; flex-wrap:wrap; align-items:center; font-size:12px; color:var(--ink-2)}
+.legend .it{display:inline-flex; align-items:center; gap:6px; white-space:nowrap}
+.legend .sw{width:14px; height:3px; border-radius:2px; flex:none}
+.legend .sw.box{width:10px; height:10px; border-radius:2px}
+.legend .note{color:var(--muted); font-size:11.5px}
+
 /* ---- ناحیه نمودار ---- */
 .stage{
   position:relative; flex:1 1 auto; min-height:260px;
@@ -117,11 +128,13 @@ button{font:inherit;color:inherit}
   .brand h1{font-size:16px}
   .chip{padding:5px 10px; font-size:12px}
   .seg button{padding:5px 9px; font-size:12px}
+  .seg.views button{padding:6px 11px; font-size:12.5px}
+  .legend{gap:10px; font-size:11.5px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
-<div class="app">
+<div class="app" hidden id="appwrap">
   <div class="top">
     <div class="brand">
       <div class="eyebrow">بورس تهران · داده روزانه</div>
@@ -135,7 +148,9 @@ button{font:inherit;color:inherit}
   </div>
 
   <div class="bars">
+    <div class="row"><div class="seg views" id="views"></div></div>
     <div class="row" id="series"></div>
+    <div class="row legend" id="legend" hidden></div>
     <div class="row">
       <span class="label">بازه</span>
       <div class="seg" id="ranges"></div>
@@ -155,24 +170,36 @@ button{font:inherit;color:inherit}
     <span id="count"></span>
   </div>
 </div>
-<div id="boot" style="padding:24px;font-family:Vazirmatn,system-ui,sans-serif;color:#82857a">
-در حال بارگذاری داده…</div>
+
+<div id='boot' style="padding:24px;font-family:Vazirmatn,system-ui,sans-serif;color:#82857a">در حال بارگذاری داده…</div>
 <script>
-window.__boot = function(DATA){
+window.__boot=function(DATA){
 /* ------------------------------------------------------------------ *
  *  نمای بازار سرمایه — نمودار خطی با جابه‌جایی و بزرگ‌نمایی
  *  محور افقی بر مبنای «روز معاملاتی» است نه روز تقویمی، پس تعطیلی بازار
  *  فاصلهٔ جعلی نمی‌سازد؛ روزهای شکاف با خط‌چین کم‌رنگ علامت می‌خورند.
  * ------------------------------------------------------------------ */
 const SERIES = [
-  {k:"index_total",  n:"شاخص کل",              u:"واحد",          ma:[50,200], c:"--s1"},
-  {k:"index_ew",     n:"شاخص هم‌وزن",           u:"واحد",          ma:[50,200], c:"--s1"},
-  {k:"value_retail", n:"ارزش معاملات خرد",      u:"میلیارد تومان", ma:[7,21],   c:"--s1"},
-  {k:"flow_retail",  n:"ورود پول حقیقی",        u:"میلیارد تومان", ma:[7,21],   c:"--s1", signed:true},
-  {k:"mv",           n:"ارزش بازار",            u:"همت",           ma:[50,200], c:"--s1"},
-  {k:"m2",           n:"نقدینگی M2",            u:"همت",           ma:[50,200], c:"--s1"},
-  {k:"ratio",        n:"ارزش بازار به نقدینگی", u:"نسبت",          ma:[50,200], c:"--s1"},
+  {k:"index_total",  n:"شاخص کل",              u:"واحد",          ma:[50,200], dec:0},
+  {k:"index_ew",     n:"شاخص هم‌وزن",           u:"واحد",          ma:[50,200], dec:0},
+  {k:"value_retail", n:"ارزش معاملات خرد",      u:"میلیارد تومان", ma:[7,21],   dec:0},
+  {k:"flow_retail",  n:"ورود پول حقیقی",        u:"میلیارد تومان", ma:[7,21],   dec:0, signed:true},
+  {k:"mv",           n:"ارزش بازار",            u:"همت",           ma:[50,200], dec:0},
+  {k:"m2",           n:"نقدینگی M2",            u:"همت",           ma:[50,200], dec:0},
+  {k:"ratio",        n:"ارزش بازار به نقدینگی", u:"نسبت",          ma:[50,200], dec:3},
 ];
+
+/* هر «نما» یک چیدمان آماده است: سری اصلی، میانگین‌ها، و پنل پایین. */
+const VIEWS = [
+  {id:"explore", tab:"نمای کلی", free:true, panel:"volume"},
+  {id:"ratio",   tab:"نسبت نقدینگی", key:"ratio", ema:[28,110], panel:"none",
+   title:"نسبت ارزش بازار به نقدینگی",
+   note:"ارزش بازار ÷ نقدینگی M2"},
+  {id:"value",   tab:"ارزش معاملات", key:"value_retail", ema:[7,28], panel:"flow",
+   title:"ارزش معاملات خرد",
+   note:"پنل پایین: خالص ورود پول حقیقی هر روز"},
+];
+
 const RANGES = [
   {n:"۱م", d:22}, {n:"۳م", d:65}, {n:"۶م", d:130},
   {n:"۱س", d:250}, {n:"۳س", d:750}, {n:"همه", d:0},
@@ -180,6 +207,7 @@ const RANGES = [
 const N = DATA.d.length;
 
 const state = {
+  view:"explore",
   key:"index_total",
   compare:[],           // کلیدهای سری در حالت مقایسه
   showMA:false,
@@ -191,17 +219,25 @@ const state = {
 /* ---------- ابزارها ---------- */
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const fa  = k => SERIES.find(s=>s.k===k);
+const view = () => VIEWS.find(v=>v.id===state.view);
 const jDate = j => `${j.slice(0,4)}/${j.slice(4,6)}/${j.slice(6)}`;
+const PD = "۰۱۲۳۴۵۶۷۸۹";
+const pnum = s => String(s).replace(/[0-9]/g, d=>PD[+d]);
 const fmt = (v,dec) => v==null ? "—"
   : v.toLocaleString("en-US",{minimumFractionDigits:dec??0,maximumFractionDigits:dec??0});
-function nice(v){
+function nice(v,dec){
   if(v==null) return "—";
+  if(v===0) v=0;                       // ‎-0 در JS وجود دارد و روی محور بد می‌نشیند
+  if(v<0) return "\u200E\u2212"+nice(-v,dec);   // علامت منفی همیشه سمت چپِ عدد
+  if(dec!=null) return fmt(v,dec);
   const a=Math.abs(v);
-  if(a>=1e6) return fmt(v,0);
   if(a>=1000) return fmt(v,0);
   if(a>=10) return fmt(v,1);
   return fmt(v,2);
 }
+/* عدد سری جاری با تعداد رقم اعشار خودش */
+const niceK = (v,k) => nice(v, fa(k)?.dec);
+
 /* فاصلهٔ تقویمی بین دو روز معاملاتی، برای علامت‌زدن تعطیلی */
 function gapDays(i){
   if(i<=0) return 0;
@@ -210,6 +246,7 @@ function gapDays(i){
   const dc=new Date(+c.slice(0,4),+c.slice(4,6)-1,+c.slice(6));
   return Math.round((dc-dp)/864e5);
 }
+/* میانگین متحرک ساده */
 function movingAvg(arr,win){
   const out=new Array(arr.length).fill(null);
   let sum=0, cnt=0; const q=[];
@@ -221,14 +258,35 @@ function movingAvg(arr,win){
   }
   return out;
 }
+/* میانگین متحرک نمایی — روزهای بی‌داده رد می‌شوند، نه اینکه صفر حساب شوند.
+   تا وقتی span مشاهدهٔ واقعی جمع نشده چیزی بیرون نمی‌دهد (دورهٔ گرم‌شدن). */
+function ema(arr,span){
+  const out=new Array(arr.length).fill(null);
+  const k=2/(span+1);
+  let prev=null, seen=0;
+  for(let i=0;i<arr.length;i++){
+    const v=arr[i];
+    if(v==null) continue;
+    prev = prev==null ? v : v*k + prev*(1-k);
+    seen++;
+    if(seen>=span) out[i]=prev;
+  }
+  return out;
+}
+/* آخرین روزی که این سری داده دارد */
+function lastValid(k){
+  const a=DATA[k]; if(!a) return N-1;
+  for(let i=N-1;i>=0;i--) if(a[i]!=null) return i;
+  return N-1;
+}
 
 /* ---------- بوم ---------- */
 const stage=document.getElementById("stage"), cv=document.getElementById("cv");
 const ctx=cv.getContext("2d"), tip=document.getElementById("tip");
 let W=0,H=0,DPR=1;
 const PAD={t:14,r:62,b:26,l:12};
-function pad(){ return {...PAD, r: W<560?50:62}; }
-const VOL_H=0.22;               // سهم پنل ارزش معاملات از ارتفاع
+function pad(){ return {...PAD, r: W<560?52:62}; }
+const PANEL_H=0.22;             // سهم پنل پایین از ارتفاع
 
 function resize(){
   const r=stage.getBoundingClientRect();
@@ -239,45 +297,49 @@ function resize(){
   draw();
 }
 
-/* ---------- محاسبهٔ چیدمان ---------- */
+/* ---------- چیدمان ---------- */
 function layout(){
   const P=pad();
-  const volTop = H-P.b-Math.round((H-P.t-P.b)*VOL_H);
+  const hasPanel = view().panel!=="none";
+  if(!hasPanel){
+    return {x0:P.l, x1:W-P.r, mainTop:P.t, mainBot:H-P.b, panelTop:null, panelBot:H-P.b, hasPanel:false};
+  }
+  const panelTop = H-P.b-Math.round((H-P.t-P.b)*PANEL_H);
   return {
     x0:P.l, x1:W-P.r,
-    mainTop:P.t, mainBot:volTop-14,
-    volTop, volBot:H-P.b,
+    mainTop:P.t, mainBot:panelTop-14,
+    panelTop, panelBot:H-P.b, hasPanel:true,
   };
 }
 const xAt = (i,L) => L.x0 + (i-state.i0)/Math.max(1,(state.i1-state.i0)) * (L.x1-L.x0);
 const iAt = (px,L) => state.i0 + (px-L.x0)/(L.x1-L.x0) * (state.i1-state.i0);
 
-function extent(keys){
-  let lo=Infinity, hi=-Infinity;
-  for(const k of keys){
-    const a=DATA[k];
-    for(let i=state.i0;i<=state.i1;i++){
-      const v=a[i]; if(v==null) continue;
-      if(v<lo)lo=v; if(v>hi)hi=v;
-    }
-  }
-  if(!isFinite(lo)) return [0,1];
-  if(lo===hi){lo-=1;hi+=1;}
-  const p=(hi-lo)*0.08;
-  return [lo-p,hi+p];
-}
 function ticks(lo,hi,n){
   const raw=(hi-lo)/n, mag=Math.pow(10,Math.floor(Math.log10(raw)));
   const step=[1,2,2.5,5,10].map(m=>m*mag).find(s=>s>=raw)||10*mag;
   const out=[]; for(let v=Math.ceil(lo/step)*step; v<=hi; v+=step) out.push(v);
   return out;
 }
+function roundRectPath(x,y,w,h,r){
+  r=Math.min(r,Math.abs(w)/2,Math.abs(h)/2);
+  ctx.beginPath();
+  if(ctx.roundRect) ctx.roundRect(x,y,w,h,r);
+  else ctx.rect(x,y,w,h);
+}
+
+/* چه چیزی در این نما رسم می‌شود */
+function plan(){
+  const V=view();
+  if(!V.free) return {keys:[V.key], indexed:false, ma:V.ema, maKind:"ema", panel:V.panel};
+  const keys = state.cmpMode && state.compare.length ? state.compare : [state.key];
+  return {keys, indexed:keys.length>1,
+          ma: state.showMA ? fa(state.key).ma : null, maKind:"sma", panel:"volume"};
+}
 
 /* ---------- ترسیم ---------- */
 function draw(){
-  const L=layout();
-  const ink=css("--ink"), ink2=css("--ink-2"), muted=css("--muted");
-  const line=css("--line"), soft=css("--line-soft"), surf=css("--surface");
+  const L=layout(), V=view(), PL=plan();
+  const muted=css("--muted"), line=css("--line"), soft=css("--line-soft"), surf=css("--surface");
   const S=[css("--s1"),css("--s2"),css("--s3")];
   const up=css("--up"), down=css("--down");
 
@@ -285,8 +347,7 @@ function draw(){
   ctx.textBaseline="middle";
   ctx.font='11px Vazirmatn,system-ui,sans-serif';
 
-  const keys = state.cmpMode && state.compare.length ? state.compare : [state.key];
-  const indexed = keys.length>1;
+  const {keys, indexed}=PL;
 
   /* سری‌های آمادهٔ رسم */
   const plot = keys.map((k,idx)=>{
@@ -299,13 +360,20 @@ function draw(){
     return {k, a, color:S[idx%3], meta:fa(k)};
   });
 
+  /* میانگین‌ها — قبل از محاسبهٔ بازهٔ عمودی، تا از کادر بیرون نزنند */
+  const mas = (!indexed && PL.ma)
+    ? PL.ma.map((p,j)=>({p, a:(PL.maKind==="ema"?ema:movingAvg)(plot[0].a,p), color:S[(j+1)%3]}))
+    : [];
+
+  /* بازهٔ عمودی پنل اصلی */
   const [lo,hi]=(()=>{
-    if(!indexed) return extent([keys[0]]);
     let l=Infinity,h=-Infinity;
-    for(const p of plot) for(let i=state.i0;i<=state.i1;i++){
-      const v=p.a[i]; if(v==null)continue; if(v<l)l=v; if(v>h)h=v;
+    const series=[...plot.map(p=>p.a), ...mas.map(m=>m.a)];
+    for(const a of series) for(let i=state.i0;i<=state.i1;i++){
+      const v=a[i]; if(v==null)continue; if(v<l)l=v; if(v>h)h=v;
     }
-    if(!isFinite(l))return[0,1];
+    if(!isFinite(l)) return [0,1];
+    if(l===h){l-=1;h+=1;}
     const pd=(h-l)*0.08; return [l-pd,h+pd];
   })();
   const yAt = v => L.mainBot - (v-lo)/(hi-lo)*(L.mainBot-L.mainTop);
@@ -313,11 +381,12 @@ function draw(){
   /* شبکه + برچسب محور عمودی */
   ctx.strokeStyle=soft; ctx.lineWidth=1;
   ctx.fillStyle=muted; ctx.textAlign="left";
+  const dec = indexed ? 0 : plot[0].meta.dec;
   for(const t of ticks(lo,hi,5)){
     const y=Math.round(yAt(t))+.5;
     if(y<L.mainTop||y>L.mainBot) continue;
     ctx.beginPath(); ctx.moveTo(L.x0,y); ctx.lineTo(L.x1,y); ctx.stroke();
-    ctx.fillText(indexed?t.toFixed(0):nice(t), L.x1+7, y);
+    ctx.fillText(indexed?t.toFixed(0):nice(t,dec), L.x1+7, y);
   }
 
   /* خط صفر برای سری‌های دوعلامته */
@@ -332,48 +401,88 @@ function draw(){
   for(let i=Math.max(1,state.i0);i<=state.i1;i++){
     if(gapDays(i)>10){
       const x=Math.round(xAt(i-0.5,L))+.5;
-      ctx.beginPath(); ctx.moveTo(x,L.mainTop); ctx.lineTo(x,L.volBot); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x,L.mainTop); ctx.lineTo(x,L.panelBot); ctx.stroke();
     }
   }
   ctx.restore();
 
-  /* پنل ارزش معاملات (میله‌ها، رنگ بر اساس جهت جریان پول) */
-  const vol=DATA.value_retail, flow=DATA.flow_retail;
-  let vmax=0; for(let i=state.i0;i<=state.i1;i++) if(vol[i]!=null&&vol[i]>vmax) vmax=vol[i];
-  if(vmax>0){
-    const bw=Math.max(1,(L.x1-L.x0)/Math.max(1,(state.i1-state.i0+1))-1);
+  /* ---- پنل پایین ---- */
+  const slot=(L.x1-L.x0)/Math.max(1,(state.i1-state.i0+1));
+  const bw=Math.max(1, slot-2);            // ۲ پیکسل فاصلهٔ سطح بین میله‌ها
+  const rad=bw>=6?3:0;
+
+  if(PL.panel==="volume" && L.hasPanel){
+    /* ارزش معاملات، رنگ بر اساس جهت جریان پول */
+    const vol=DATA.value_retail, flow=DATA.flow_retail;
+    let vmax=0; for(let i=state.i0;i<=state.i1;i++) if(vol[i]!=null&&vol[i]>vmax) vmax=vol[i];
+    if(vmax>0){
+      for(let i=state.i0;i<=state.i1;i++){
+        const v=vol[i]; if(v==null) continue;
+        const h=(v/vmax)*(L.panelBot-L.panelTop);
+        const f=flow[i];
+        ctx.fillStyle = f==null ? css("--edge") : (f>=0?up:down);
+        ctx.globalAlpha=.4;
+        ctx.fillRect(xAt(i,L)-bw/2, L.panelBot-h, bw, h);
+      }
+      ctx.globalAlpha=1;
+      ctx.fillStyle=muted; ctx.textAlign="right";
+      ctx.font='10px Vazirmatn,system-ui,sans-serif';
+      if(W>=560) ctx.fillText("ارزش معاملات خرد", L.x1-6, L.panelTop+7);
+      ctx.font='11px Vazirmatn,system-ui,sans-serif';
+    }
+  }
+
+  if(PL.panel==="flow" && L.hasPanel){
+    /* خالص ورود پول حقیقی — میلهٔ دوسویه حول خط صفر */
+    const flow=DATA.flow_retail;
+    let flo=0, fhi=0;
     for(let i=state.i0;i<=state.i1;i++){
-      const v=vol[i]; if(v==null) continue;
-      const h=(v/vmax)*(L.volBot-L.volTop);
-      const f=flow[i];
-      ctx.fillStyle = f==null ? css("--edge") : (f>=0?up:down);
-      ctx.globalAlpha=.4;
-      ctx.fillRect(xAt(i,L)-bw/2, L.volBot-h, bw, h);
+      const v=flow[i]; if(v==null) continue;
+      if(v<flo)flo=v; if(v>fhi)fhi=v;
+    }
+    if(flo===0&&fhi===0){flo=-1;fhi=1;}
+    const padf=(fhi-flo)*0.06; flo-=padf; fhi+=padf;
+    const fy = v => L.panelBot - (v-flo)/(fhi-flo)*(L.panelBot-L.panelTop);
+    const zy = fy(0);
+
+    for(let i=state.i0;i<=state.i1;i++){
+      const v=flow[i]; if(v==null) continue;
+      const y=fy(v), top=Math.min(y,zy), h=Math.max(1,Math.abs(y-zy));
+      ctx.fillStyle = v>=0?up:down;
+      ctx.globalAlpha=.9;
+      if(rad){ roundRectPath(xAt(i,L)-bw/2, top, bw, h, rad); ctx.fill(); }
+      else ctx.fillRect(xAt(i,L)-bw/2, top, bw, h);
     }
     ctx.globalAlpha=1;
-    ctx.fillStyle=muted; ctx.textAlign="right";
-    ctx.font='10px Vazirmatn,system-ui,sans-serif';
-    ctx.fillText("ارزش معاملات خرد", L.x1-6, L.volTop+7);
+    /* خط صفر */
+    ctx.strokeStyle=css("--edge"); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(L.x0,Math.round(zy)+.5); ctx.lineTo(L.x1,Math.round(zy)+.5); ctx.stroke();
+    /* بیشینه و کمینهٔ پنل روی محور راست */
+    ctx.fillStyle=muted; ctx.textAlign="left"; ctx.font='10px Vazirmatn,system-ui,sans-serif';
+    const ftop=fhi-padf, fbot=flo+padf;
+    const yTop=Math.max(L.panelTop+6, fy(ftop)), yBot=Math.min(L.panelBot-6, fy(fbot));
+    ctx.fillText(nice(ftop,0), L.x1+7, yTop);
+    ctx.fillText(nice(fbot,0), L.x1+7, yBot);
+    if(Math.abs(zy-yTop)>11 && Math.abs(zy-yBot)>11) ctx.fillText("0", L.x1+7, zy);
+    ctx.textAlign="right";
+    if(W>=560) ctx.fillText("خالص ورود پول حقیقی", L.x1-6, L.panelTop+7);
     ctx.font='11px Vazirmatn,system-ui,sans-serif';
   }
 
-  /* میانگین‌های متحرک */
-  if(state.showMA && !indexed){
-    const per=plot[0].meta.ma;
-    per.forEach((p,j)=>{
-      const m=movingAvg(plot[0].a,p);
-      ctx.strokeStyle=S[(j+1)%3]; ctx.lineWidth=1.5; ctx.beginPath();
-      let pen=false;
-      for(let i=state.i0;i<=state.i1;i++){
-        const v=m[i]; if(v==null){pen=false;continue;}
-        const x=xAt(i,L), y=yAt(v);
-        pen?ctx.lineTo(x,y):ctx.moveTo(x,y); pen=true;
-      }
-      ctx.stroke();
-    });
+  /* ---- میانگین‌های متحرک ---- */
+  for(const m of mas){
+    ctx.strokeStyle=m.color; ctx.lineWidth=1.5;
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    ctx.beginPath(); let pen=false;
+    for(let i=state.i0;i<=state.i1;i++){
+      const v=m.a[i]; if(v==null){pen=false;continue;}
+      const x=xAt(i,L), y=yAt(v);
+      pen?ctx.lineTo(x,y):ctx.moveTo(x,y); pen=true;
+    }
+    ctx.stroke();
   }
 
-  /* خطوط اصلی */
+  /* ---- خطوط اصلی ---- */
   for(const p of plot){
     ctx.strokeStyle=p.color; ctx.lineWidth=2;
     ctx.lineJoin="round"; ctx.lineCap="round";
@@ -385,15 +494,11 @@ function draw(){
     }
     ctx.stroke();
 
-    /* برچسب مستقیم انتهای خط */
     let last=null; for(let i=state.i1;i>=state.i0;i--){ if(p.a[i]!=null){last=i;break;} }
     if(last!=null){
       const x=xAt(last,L), y=yAt(p.a[last]);
       ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(x,y,3,0,7); ctx.fill();
-      if(indexed){
-        ctx.textAlign="right";
-        ctx.fillText(p.meta.n, x-8, y);
-      }
+      if(indexed){ ctx.textAlign="right"; ctx.fillText(p.meta.n, x-8, y); }
     }
   }
 
@@ -406,14 +511,14 @@ function draw(){
     const d=DATA.d[i], lab=`${d.slice(0,4)}/${d.slice(4,6)}`;
     if(lab===prev) continue; prev=lab;
     const x=xAt(i,L);
-    if(x>L.x0+18 && x<L.x1-18) ctx.fillText(lab, x, L.volBot+13);
+    if(x>L.x0+18 && x<L.x1-18) ctx.fillText(lab, x, L.panelBot+13);
   }
 
   /* نشانگر متقاطع */
   if(state.hover>=state.i0 && state.hover<=state.i1){
     const x=Math.round(xAt(state.hover,L))+.5;
     ctx.save(); ctx.setLineDash([3,3]); ctx.strokeStyle=css("--edge");
-    ctx.beginPath(); ctx.moveTo(x,L.mainTop); ctx.lineTo(x,L.volBot); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x,L.mainTop); ctx.lineTo(x,L.panelBot); ctx.stroke();
     ctx.restore();
     for(const p of plot){
       const v=p.a[state.hover]; if(v==null) continue;
@@ -424,28 +529,32 @@ function draw(){
   }
 
   /* خط جداکنندهٔ پنل‌ها */
-  ctx.strokeStyle=line; ctx.lineWidth=1;
-  ctx.beginPath();
-  ctx.moveTo(L.x0,Math.round(L.volTop-7)+.5); ctx.lineTo(L.x1,Math.round(L.volTop-7)+.5);
-  ctx.stroke();
+  if(L.hasPanel){
+    ctx.strokeStyle=line; ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(L.x0,Math.round(L.panelTop-7)+.5); ctx.lineTo(L.x1,Math.round(L.panelTop-7)+.5);
+    ctx.stroke();
+  }
 
-  updateQuote(plot, indexed);
+  window.__mas = mas;      // برای راهنمای شناور
+  updateQuote(indexed);
 }
 
 /* ---------- سربرگ عددی ---------- */
-function updateQuote(plot, indexed){
-  const k=state.key, a=DATA[k], m=fa(k);
+function updateQuote(indexed){
+  const V=view(), k=state.key, a=DATA[k], m=fa(k);
   let last=null; for(let i=N-1;i>=0;i--){ if(a[i]!=null){last=i;break;} }
   document.getElementById("title").textContent =
-    (state.cmpMode && state.compare.length>1) ? "مقایسه سری‌ها (پایه ۱۰۰)" : m.n;
+    (V.free && state.cmpMode && state.compare.length>1) ? "مقایسه سری‌ها (پایه ۱۰۰)"
+    : (V.title || m.n);
   if(last==null) return;
   let prev=null; for(let i=last-1;i>=0;i--){ if(a[i]!=null){prev=i;break;} }
   const v=a[last], p=prev!=null?a[prev]:null;
-  document.getElementById("qval").textContent=nice(v);
+  document.getElementById("qval").textContent=niceK(v,k);
   const chg=document.getElementById("qchg");
   if(p!=null && p!==0){
     const d=v-p, pc=d/Math.abs(p)*100;
-    chg.textContent=`${d>=0?"+":"−"}${nice(Math.abs(d))} (${d>=0?"+":"−"}${Math.abs(pc).toFixed(2)}٪)`;
+    chg.textContent=`${d>=0?"+":"−"}${niceK(Math.abs(d),k)} (${d>=0?"+":"−"}${Math.abs(pc).toFixed(2)}٪)`;
     chg.className="chg "+(d>=0?"up":"down");
   } else { chg.textContent=""; chg.className="chg"; }
   document.getElementById("qasof").textContent=`${jDate(DATA.d[last])} · ${m.u}`;
@@ -457,17 +566,27 @@ function updateQuote(plot, indexed){
 function showTip(px,py){
   const i=state.hover;
   if(i<0){ tip.style.opacity=0; return; }
-  const keys = state.cmpMode && state.compare.length ? state.compare : [state.key];
-  const S=[css("--s1"),css("--s2"),css("--s3")];
+  const PL=plan(), S=[css("--s1"),css("--s2"),css("--s3")];
   let html=`<div class="d">${jDate(DATA.d[i])}</div>`;
-  keys.forEach((k,idx)=>{
+  PL.keys.forEach((k,idx)=>{
     const m=fa(k), v=DATA[k][i];
     html+=`<div class="r"><span class="dot" style="background:${S[idx%3]}"></span>`+
-          `<span class="n">${m.n}</span><span class="v">${nice(v)}</span></div>`;
+          `<span class="n">${m.n}</span><span class="v">${niceK(v,k)}</span></div>`;
   });
-  if(!keys.includes("value_retail") && DATA.value_retail[i]!=null)
+  for(const m of (window.__mas||[])){
+    if(m.a[i]==null) continue;
+    html+=`<div class="r"><span class="dot" style="background:${m.color}"></span>`+
+          `<span class="n">${(PL.maKind==="ema"?"EMA ":"MA ")+pnum(m.p)}</span>`+
+          `<span class="v">${niceK(m.a[i],PL.keys[0])}</span></div>`;
+  }
+  if(PL.panel==="flow" && !PL.keys.includes("flow_retail") && DATA.flow_retail[i]!=null){
+    const f=DATA.flow_retail[i];
+    html+=`<div class="r"><span class="dot" style="background:${f>=0?css("--up"):css("--down")}"></span>`+
+          `<span class="n">ورود پول حقیقی</span><span class="v">${nice(f,0)}</span></div>`;
+  }
+  if(PL.panel==="volume" && !PL.keys.includes("value_retail") && DATA.value_retail[i]!=null)
     html+=`<div class="r"><span class="dot" style="background:${css("--edge")}"></span>`+
-          `<span class="n">ارزش معاملات</span><span class="v">${nice(DATA.value_retail[i])}</span></div>`;
+          `<span class="n">ارزش معاملات</span><span class="v">${nice(DATA.value_retail[i],0)}</span></div>`;
   tip.innerHTML=html;
   tip.style.opacity=1;
   const r=tip.getBoundingClientRect();
@@ -503,7 +622,7 @@ stage.addEventListener("pointermove",e=>{
   state.hover=(i>=state.i0&&i<=state.i1)?i:-1;
   draw(); showTip(e.offsetX,e.offsetY);
 });
-const endDrag=e=>{ drag=null; };
+const endDrag=()=>{ drag=null; };
 stage.addEventListener("pointerup",endDrag);
 stage.addEventListener("pointercancel",endDrag);
 stage.addEventListener("pointerleave",()=>{ drag=null; state.hover=-1; tip.style.opacity=0; draw(); });
@@ -518,6 +637,15 @@ stage.addEventListener("wheel",e=>{
 stage.addEventListener("dblclick",()=>{ state.i0=0; state.i1=N-1; draw(); });
 
 /* ---------- کنترل‌ها ---------- */
+const viewsRow=document.getElementById("views");
+VIEWS.forEach(v=>{
+  const b=document.createElement("button");
+  b.type="button"; b.textContent=v.tab; b.dataset.v=v.id;
+  b.setAttribute("aria-pressed", v.id===state.view?"true":"false");
+  b.addEventListener("click",()=>setView(v.id));
+  viewsRow.appendChild(b);
+});
+
 const seriesRow=document.getElementById("series");
 SERIES.forEach(s=>{
   const b=document.createElement("button");
@@ -537,31 +665,37 @@ SERIES.forEach(s=>{
   });
   seriesRow.appendChild(b);
 });
-function syncChips(){
-  const S=[css("--s1"),css("--s2"),css("--s3")];
-  seriesRow.querySelectorAll(".chip").forEach(b=>{
-    const k=b.dataset.k;
-    const on = state.cmpMode ? state.compare.includes(k) : k===state.key;
-    b.setAttribute("aria-pressed", on?"true":"false");
-    const idx = state.cmpMode ? state.compare.indexOf(k) : 0;
-    b.querySelector(".dot").style.background = on ? S[Math.max(0,idx)%3] : "var(--edge)";
-  });
-  document.getElementById("ma").hidden = state.cmpMode && state.compare.length>1;
-}
+
 const rangeRow=document.getElementById("ranges");
 RANGES.forEach((r,idx)=>{
   const b=document.createElement("button");
-  b.type="button"; b.textContent=r.n;
+  b.type="button"; b.textContent=r.n; b.dataset.d=r.d;
   b.setAttribute("aria-pressed", r.d===250 ? "true":"false");
-  b.addEventListener("click",()=>{
-    state.i1=N-1;
-    state.i0 = r.d ? Math.max(0,N-r.d) : 0;
-    clampView();
-    rangeRow.querySelectorAll("button").forEach((x,j)=>x.setAttribute("aria-pressed", j===idx?"true":"false"));
-    draw();
-  });
+  b.addEventListener("click",()=>{ applyRange(r.d); markRange(idx); draw(); });
   rangeRow.appendChild(b);
 });
+function markRange(idx){
+  rangeRow.querySelectorAll("button").forEach((x,j)=>x.setAttribute("aria-pressed", j===idx?"true":"false"));
+}
+/* بازه به آخرین روزی ختم می‌شود که سری جاری داده دارد، نه آخرین روز جدول */
+function applyRange(d){
+  const end = view().free ? N-1 : lastValid(state.key);
+  state.i1=end;
+  state.i0 = d ? Math.max(0,end-d+1) : 0;
+  clampView();
+}
+
+function setView(id){
+  state.view=id;
+  const V=view();
+  if(!V.free){ state.key=V.key; state.compare=[V.key]; state.cmpMode=false; }
+  viewsRow.querySelectorAll("button").forEach(b=>
+    b.setAttribute("aria-pressed", b.dataset.v===id?"true":"false"));
+  applyRange(V.free?0:250);
+  markRange(V.free?5:3);
+  syncChips(); draw();
+}
+
 document.getElementById("ma").addEventListener("click",e=>{
   state.showMA=!state.showMA;
   e.currentTarget.setAttribute("aria-pressed", state.showMA?"true":"false");
@@ -576,21 +710,50 @@ document.getElementById("cmp").addEventListener("click",e=>{
   syncChips(); draw();
 });
 
+const legendRow=document.getElementById("legend");
+function syncChips(){
+  const V=view(), S=[css("--s1"),css("--s2"),css("--s3")];
+  const free=!!V.free;
+
+  seriesRow.hidden = !free;
+  document.getElementById("cmp").hidden = !free;
+  document.getElementById("ma").hidden = !free || (state.cmpMode && state.compare.length>1);
+
+  seriesRow.querySelectorAll(".chip").forEach(b=>{
+    const k=b.dataset.k;
+    const on = state.cmpMode ? state.compare.includes(k) : k===state.key;
+    b.setAttribute("aria-pressed", on?"true":"false");
+    const idx = state.cmpMode ? state.compare.indexOf(k) : 0;
+    b.querySelector(".dot").style.background = on ? S[Math.max(0,idx)%3] : "var(--edge)";
+  });
+
+  legendRow.hidden = free;
+  if(free) return;
+  const items=[[S[0],fa(V.key).n,"line"]];
+  V.ema.forEach((p,j)=>items.push([S[(j+1)%3],"EMA "+pnum(p),"line"]));
+  if(V.panel==="flow"){
+    items.push([css("--up"),"ورود پول (مثبت)","box"]);
+    items.push([css("--down"),"خروج پول (منفی)","box"]);
+  }
+  legendRow.innerHTML = items.map(([c,n,kind])=>
+    `<span class="it"><span class="sw${kind==="box"?" box":""}" style="background:${c}"></span>${n}</span>`
+  ).join("") + (V.note?`<span class="note">${V.note}</span>`:"");
+}
+
 /* ---------- راه‌اندازی ---------- */
 new ResizeObserver(resize).observe(stage);
-matchMedia("(prefers-color-scheme:dark)").addEventListener("change",draw);
-new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+matchMedia("(prefers-color-scheme:dark)").addEventListener("change",()=>{syncChips();draw();});
+new MutationObserver(()=>{syncChips();draw();}).observe(
+  document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
 document.fonts?.ready?.then(draw);
 state.compare=[state.key];
 syncChips();
 resize();
 
 };
-fetch('data.json?v=' + Date.now())
-  .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-  .then(function(d){ document.getElementById('boot').remove(); window.__boot(d); })
-  .catch(function(e){
-    document.getElementById('boot').textContent =
-      'داده بارگذاری نشد (' + e.message + '). مطمئن شوید data.json کنار همین صفحه است.';
-  });
-</script></body></html>
+fetch('data.json?v='+Date.now())
+  .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  .then(function(d){ document.getElementById('boot').remove(); document.getElementById('appwrap').hidden=false; window.__boot(d); })
+  .catch(function(e){ document.getElementById('boot').textContent='داده بارگذاری نشد ('+e.message+'). مطمئن شوید data.json کنار همین صفحه است.'; });
+</script>
+</body></html>
