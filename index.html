@@ -1,0 +1,596 @@
+<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'><style>:root{color-scheme:light}html,body{margin:0}[hidden]{display:none!important}</style></head><body><title>نمای بازار سرمایه</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap">
+<style>
+:root{
+  --ground:#fbfbf9; --surface:#ffffff; --raised:#f4f4f0;
+  --ink:#14150f; --ink-2:#4d4f46; --muted:#82857a;
+  --line:#e4e4dd; --line-soft:#eeeee8; --edge:#cfd0c7;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --up:#0ca30c; --down:#d03b3b;
+  --focus:#2a78d6;
+  --shadow:0 1px 2px rgba(20,21,15,.06),0 8px 24px rgba(20,21,15,.07);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#131410; --surface:#1b1c18; --raised:#232420;
+    --ink:#f3f3ee; --ink-2:#c6c8bd; --muted:#8f9287;
+    --line:#2b2d27; --line-soft:#232520; --edge:#3a3c35;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --up:#2fb92f; --down:#e05c5c;
+    --focus:#3987e5;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#131410; --surface:#1b1c18; --raised:#232420;
+  --ink:#f3f3ee; --ink-2:#c6c8bd; --muted:#8f9287;
+  --line:#2b2d27; --line-soft:#232520; --edge:#3a3c35;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --up:#2fb92f; --down:#e05c5c;
+  --focus:#3987e5;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.45);
+}
+
+html,body{height:100%}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:Vazirmatn,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:14px; line-height:1.55; direction:rtl;
+  -webkit-font-smoothing:antialiased;
+}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus); outline-offset:2px; border-radius:6px}
+
+.app{
+  height:100%; display:flex; flex-direction:column;
+  padding-inline:16px; padding-block:14px 12px; gap:12px;
+  max-width:1400px; margin:0 auto;
+}
+
+/* ---- سربرگ ---- */
+.top{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap}
+.brand{display:flex; flex-direction:column; gap:1px; min-width:0}
+.eyebrow{
+  font-size:10.5px; letter-spacing:.14em; color:var(--muted);
+  text-transform:uppercase; font-weight:500;
+}
+.brand h1{margin:0; font-size:19px; font-weight:700; letter-spacing:-.01em; text-wrap:balance}
+.quote{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+.quote .val{font-size:27px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1.1}
+.quote .chg{font-size:13px; font-weight:500; font-variant-numeric:tabular-nums}
+.quote .asof{font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums}
+.up{color:var(--up)} .down{color:var(--down)}
+
+/* ---- کنترل‌ها ---- */
+.bars{display:flex; flex-direction:column; gap:8px}
+.row{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+.row .sep{flex:1 1 auto}
+.chip{
+  border:1px solid var(--line); background:var(--surface); color:var(--ink-2);
+  border-radius:999px; padding:5px 12px; font-size:12.5px; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+  transition:border-color .12s, background .12s, color .12s;
+}
+.chip:hover{border-color:var(--edge)}
+.chip[aria-pressed="true"]{background:var(--ink); border-color:var(--ink); color:var(--ground); font-weight:500}
+.chip .dot{width:8px; height:8px; border-radius:50%; flex:none}
+.seg{display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--surface)}
+.seg button{
+  border:0; background:transparent; padding:5px 11px; font-size:12.5px;
+  cursor:pointer; color:var(--ink-2); font-variant-numeric:tabular-nums;
+  border-inline-start:1px solid var(--line-soft);
+}
+.seg button:first-child{border-inline-start:0}
+.seg button[aria-pressed="true"]{background:var(--raised); color:var(--ink); font-weight:600}
+.label{font-size:11.5px; color:var(--muted); margin-inline-end:2px}
+
+/* ---- ناحیه نمودار ---- */
+.stage{
+  position:relative; flex:1 1 auto; min-height:260px;
+  background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  box-shadow:var(--shadow); overflow:hidden;
+  touch-action:none; cursor:crosshair;
+}
+.stage canvas{display:block; width:100%; height:100%}
+.tip{
+  position:absolute; pointer-events:none; z-index:3; opacity:0;
+  background:var(--surface); border:1px solid var(--edge); border-radius:9px;
+  padding:8px 10px; box-shadow:var(--shadow); min-width:150px;
+  transition:opacity .08s;
+}
+.tip .d{font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; margin-bottom:5px}
+.tip .r{display:flex; align-items:center; gap:7px; font-size:12.5px; line-height:1.8; white-space:nowrap}
+.tip .r .dot{width:7px;height:7px;border-radius:50%;flex:none}
+.tip .r .n{color:var(--ink-2); flex:1 1 auto}
+.tip .r .v{font-variant-numeric:tabular-nums; font-weight:600}
+
+.foot{display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; font-size:11.5px; color:var(--muted)}
+.foot kbd{
+  font-family:inherit; font-size:11px; background:var(--raised);
+  border:1px solid var(--line); border-radius:4px; padding:1px 5px; color:var(--ink-2);
+}
+
+@media (max-width:720px){
+  .app{padding-inline:12px}
+  .quote .val{font-size:22px}
+  .brand h1{font-size:16px}
+  .chip{padding:5px 10px; font-size:12px}
+  .seg button{padding:5px 9px; font-size:12px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <div class="top">
+    <div class="brand">
+      <div class="eyebrow">بورس تهران · داده روزانه</div>
+      <h1 id="title">شاخص کل</h1>
+    </div>
+    <div class="quote">
+      <span class="val" id="qval">—</span>
+      <span class="chg" id="qchg"></span>
+      <span class="asof" id="qasof"></span>
+    </div>
+  </div>
+
+  <div class="bars">
+    <div class="row" id="series"></div>
+    <div class="row">
+      <span class="label">بازه</span>
+      <div class="seg" id="ranges"></div>
+      <span class="sep"></span>
+      <button class="chip" id="ma" aria-pressed="false">میانگین متحرک</button>
+      <button class="chip" id="cmp" aria-pressed="false">مقایسه (پایه ۱۰۰)</button>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <canvas id="cv"></canvas>
+    <div class="tip" id="tip"></div>
+  </div>
+
+  <div class="foot">
+    <span>کشیدن برای جابه‌جایی · <kbd>اسکرول</kbd> برای بزرگ‌نمایی · دوضربه برای بازگشت به کل بازه</span>
+    <span id="count"></span>
+  </div>
+</div>
+<div id="boot" style="padding:24px;font-family:Vazirmatn,system-ui,sans-serif;color:#82857a">
+در حال بارگذاری داده…</div>
+<script>
+window.__boot = function(DATA){
+/* ------------------------------------------------------------------ *
+ *  نمای بازار سرمایه — نمودار خطی با جابه‌جایی و بزرگ‌نمایی
+ *  محور افقی بر مبنای «روز معاملاتی» است نه روز تقویمی، پس تعطیلی بازار
+ *  فاصلهٔ جعلی نمی‌سازد؛ روزهای شکاف با خط‌چین کم‌رنگ علامت می‌خورند.
+ * ------------------------------------------------------------------ */
+const SERIES = [
+  {k:"index_total",  n:"شاخص کل",              u:"واحد",          ma:[50,200], c:"--s1"},
+  {k:"index_ew",     n:"شاخص هم‌وزن",           u:"واحد",          ma:[50,200], c:"--s1"},
+  {k:"value_retail", n:"ارزش معاملات خرد",      u:"میلیارد تومان", ma:[7,21],   c:"--s1"},
+  {k:"flow_retail",  n:"ورود پول حقیقی",        u:"میلیارد تومان", ma:[7,21],   c:"--s1", signed:true},
+  {k:"mv",           n:"ارزش بازار",            u:"همت",           ma:[50,200], c:"--s1"},
+  {k:"m2",           n:"نقدینگی M2",            u:"همت",           ma:[50,200], c:"--s1"},
+  {k:"ratio",        n:"ارزش بازار به نقدینگی", u:"نسبت",          ma:[50,200], c:"--s1"},
+];
+const RANGES = [
+  {n:"۱م", d:22}, {n:"۳م", d:65}, {n:"۶م", d:130},
+  {n:"۱س", d:250}, {n:"۳س", d:750}, {n:"همه", d:0},
+];
+const N = DATA.d.length;
+
+const state = {
+  key:"index_total",
+  compare:[],           // کلیدهای سری در حالت مقایسه
+  showMA:false,
+  cmpMode:false,
+  i0:Math.max(0,N-250), i1:N-1,
+  hover:-1,
+};
+
+/* ---------- ابزارها ---------- */
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fa  = k => SERIES.find(s=>s.k===k);
+const jDate = j => `${j.slice(0,4)}/${j.slice(4,6)}/${j.slice(6)}`;
+const fmt = (v,dec) => v==null ? "—"
+  : v.toLocaleString("en-US",{minimumFractionDigits:dec??0,maximumFractionDigits:dec??0});
+function nice(v){
+  if(v==null) return "—";
+  const a=Math.abs(v);
+  if(a>=1e6) return fmt(v,0);
+  if(a>=1000) return fmt(v,0);
+  if(a>=10) return fmt(v,1);
+  return fmt(v,2);
+}
+/* فاصلهٔ تقویمی بین دو روز معاملاتی، برای علامت‌زدن تعطیلی */
+function gapDays(i){
+  if(i<=0) return 0;
+  const p=String(DATA.t[i-1]), c=String(DATA.t[i]);
+  const dp=new Date(+p.slice(0,4),+p.slice(4,6)-1,+p.slice(6));
+  const dc=new Date(+c.slice(0,4),+c.slice(4,6)-1,+c.slice(6));
+  return Math.round((dc-dp)/864e5);
+}
+function movingAvg(arr,win){
+  const out=new Array(arr.length).fill(null);
+  let sum=0, cnt=0; const q=[];
+  for(let i=0;i<arr.length;i++){
+    const v=arr[i];
+    q.push(v); if(v!=null){sum+=v;cnt++;}
+    if(q.length>win){const o=q.shift(); if(o!=null){sum-=o;cnt--;}}
+    if(q.length===win && cnt>=Math.ceil(win*0.6)) out[i]=sum/cnt;
+  }
+  return out;
+}
+
+/* ---------- بوم ---------- */
+const stage=document.getElementById("stage"), cv=document.getElementById("cv");
+const ctx=cv.getContext("2d"), tip=document.getElementById("tip");
+let W=0,H=0,DPR=1;
+const PAD={t:14,r:62,b:26,l:12};
+function pad(){ return {...PAD, r: W<560?50:62}; }
+const VOL_H=0.22;               // سهم پنل ارزش معاملات از ارتفاع
+
+function resize(){
+  const r=stage.getBoundingClientRect();
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  W=Math.max(1,r.width); H=Math.max(1,r.height);
+  cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  draw();
+}
+
+/* ---------- محاسبهٔ چیدمان ---------- */
+function layout(){
+  const P=pad();
+  const volTop = H-P.b-Math.round((H-P.t-P.b)*VOL_H);
+  return {
+    x0:P.l, x1:W-P.r,
+    mainTop:P.t, mainBot:volTop-14,
+    volTop, volBot:H-P.b,
+  };
+}
+const xAt = (i,L) => L.x0 + (i-state.i0)/Math.max(1,(state.i1-state.i0)) * (L.x1-L.x0);
+const iAt = (px,L) => state.i0 + (px-L.x0)/(L.x1-L.x0) * (state.i1-state.i0);
+
+function extent(keys){
+  let lo=Infinity, hi=-Infinity;
+  for(const k of keys){
+    const a=DATA[k];
+    for(let i=state.i0;i<=state.i1;i++){
+      const v=a[i]; if(v==null) continue;
+      if(v<lo)lo=v; if(v>hi)hi=v;
+    }
+  }
+  if(!isFinite(lo)) return [0,1];
+  if(lo===hi){lo-=1;hi+=1;}
+  const p=(hi-lo)*0.08;
+  return [lo-p,hi+p];
+}
+function ticks(lo,hi,n){
+  const raw=(hi-lo)/n, mag=Math.pow(10,Math.floor(Math.log10(raw)));
+  const step=[1,2,2.5,5,10].map(m=>m*mag).find(s=>s>=raw)||10*mag;
+  const out=[]; for(let v=Math.ceil(lo/step)*step; v<=hi; v+=step) out.push(v);
+  return out;
+}
+
+/* ---------- ترسیم ---------- */
+function draw(){
+  const L=layout();
+  const ink=css("--ink"), ink2=css("--ink-2"), muted=css("--muted");
+  const line=css("--line"), soft=css("--line-soft"), surf=css("--surface");
+  const S=[css("--s1"),css("--s2"),css("--s3")];
+  const up=css("--up"), down=css("--down");
+
+  ctx.clearRect(0,0,W,H);
+  ctx.textBaseline="middle";
+  ctx.font='11px Vazirmatn,system-ui,sans-serif';
+
+  const keys = state.cmpMode && state.compare.length ? state.compare : [state.key];
+  const indexed = keys.length>1;
+
+  /* سری‌های آمادهٔ رسم */
+  const plot = keys.map((k,idx)=>{
+    let a=DATA[k];
+    if(indexed){
+      let base=null;
+      for(let i=state.i0;i<=state.i1;i++){ if(a[i]!=null){base=a[i];break;} }
+      a = base ? a.map(v=>v==null?null:v/base*100) : a;
+    }
+    return {k, a, color:S[idx%3], meta:fa(k)};
+  });
+
+  const [lo,hi]=(()=>{
+    if(!indexed) return extent([keys[0]]);
+    let l=Infinity,h=-Infinity;
+    for(const p of plot) for(let i=state.i0;i<=state.i1;i++){
+      const v=p.a[i]; if(v==null)continue; if(v<l)l=v; if(v>h)h=v;
+    }
+    if(!isFinite(l))return[0,1];
+    const pd=(h-l)*0.08; return [l-pd,h+pd];
+  })();
+  const yAt = v => L.mainBot - (v-lo)/(hi-lo)*(L.mainBot-L.mainTop);
+
+  /* شبکه + برچسب محور عمودی */
+  ctx.strokeStyle=soft; ctx.lineWidth=1;
+  ctx.fillStyle=muted; ctx.textAlign="left";
+  for(const t of ticks(lo,hi,5)){
+    const y=Math.round(yAt(t))+.5;
+    if(y<L.mainTop||y>L.mainBot) continue;
+    ctx.beginPath(); ctx.moveTo(L.x0,y); ctx.lineTo(L.x1,y); ctx.stroke();
+    ctx.fillText(indexed?t.toFixed(0):nice(t), L.x1+7, y);
+  }
+
+  /* خط صفر برای سری‌های دوعلامته */
+  if(!indexed && plot[0].meta.signed && lo<0 && hi>0){
+    const y=Math.round(yAt(0))+.5;
+    ctx.strokeStyle=css("--edge"); ctx.beginPath();
+    ctx.moveTo(L.x0,y); ctx.lineTo(L.x1,y); ctx.stroke();
+  }
+
+  /* علامت تعطیلی بازار */
+  ctx.save(); ctx.setLineDash([2,4]); ctx.strokeStyle=line;
+  for(let i=Math.max(1,state.i0);i<=state.i1;i++){
+    if(gapDays(i)>10){
+      const x=Math.round(xAt(i-0.5,L))+.5;
+      ctx.beginPath(); ctx.moveTo(x,L.mainTop); ctx.lineTo(x,L.volBot); ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  /* پنل ارزش معاملات (میله‌ها، رنگ بر اساس جهت جریان پول) */
+  const vol=DATA.value_retail, flow=DATA.flow_retail;
+  let vmax=0; for(let i=state.i0;i<=state.i1;i++) if(vol[i]!=null&&vol[i]>vmax) vmax=vol[i];
+  if(vmax>0){
+    const bw=Math.max(1,(L.x1-L.x0)/Math.max(1,(state.i1-state.i0+1))-1);
+    for(let i=state.i0;i<=state.i1;i++){
+      const v=vol[i]; if(v==null) continue;
+      const h=(v/vmax)*(L.volBot-L.volTop);
+      const f=flow[i];
+      ctx.fillStyle = f==null ? css("--edge") : (f>=0?up:down);
+      ctx.globalAlpha=.4;
+      ctx.fillRect(xAt(i,L)-bw/2, L.volBot-h, bw, h);
+    }
+    ctx.globalAlpha=1;
+    ctx.fillStyle=muted; ctx.textAlign="right";
+    ctx.font='10px Vazirmatn,system-ui,sans-serif';
+    ctx.fillText("ارزش معاملات خرد", L.x1-6, L.volTop+7);
+    ctx.font='11px Vazirmatn,system-ui,sans-serif';
+  }
+
+  /* میانگین‌های متحرک */
+  if(state.showMA && !indexed){
+    const per=plot[0].meta.ma;
+    per.forEach((p,j)=>{
+      const m=movingAvg(plot[0].a,p);
+      ctx.strokeStyle=S[(j+1)%3]; ctx.lineWidth=1.5; ctx.beginPath();
+      let pen=false;
+      for(let i=state.i0;i<=state.i1;i++){
+        const v=m[i]; if(v==null){pen=false;continue;}
+        const x=xAt(i,L), y=yAt(v);
+        pen?ctx.lineTo(x,y):ctx.moveTo(x,y); pen=true;
+      }
+      ctx.stroke();
+    });
+  }
+
+  /* خطوط اصلی */
+  for(const p of plot){
+    ctx.strokeStyle=p.color; ctx.lineWidth=2;
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    ctx.beginPath(); let pen=false;
+    for(let i=state.i0;i<=state.i1;i++){
+      const v=p.a[i]; if(v==null){pen=false;continue;}
+      const x=xAt(i,L), y=yAt(v);
+      pen?ctx.lineTo(x,y):ctx.moveTo(x,y); pen=true;
+    }
+    ctx.stroke();
+
+    /* برچسب مستقیم انتهای خط */
+    let last=null; for(let i=state.i1;i>=state.i0;i--){ if(p.a[i]!=null){last=i;break;} }
+    if(last!=null){
+      const x=xAt(last,L), y=yAt(p.a[last]);
+      ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(x,y,3,0,7); ctx.fill();
+      if(indexed){
+        ctx.textAlign="right";
+        ctx.fillText(p.meta.n, x-8, y);
+      }
+    }
+  }
+
+  /* برچسب محور افقی */
+  ctx.fillStyle=muted; ctx.textAlign="center";
+  const nLab=W<560?3:(W<820?4:6);
+  const span=state.i1-state.i0, step=Math.max(1,Math.round(span/nLab));
+  let prev="";
+  for(let i=state.i0;i<=state.i1;i+=step){
+    const d=DATA.d[i], lab=`${d.slice(0,4)}/${d.slice(4,6)}`;
+    if(lab===prev) continue; prev=lab;
+    const x=xAt(i,L);
+    if(x>L.x0+18 && x<L.x1-18) ctx.fillText(lab, x, L.volBot+13);
+  }
+
+  /* نشانگر متقاطع */
+  if(state.hover>=state.i0 && state.hover<=state.i1){
+    const x=Math.round(xAt(state.hover,L))+.5;
+    ctx.save(); ctx.setLineDash([3,3]); ctx.strokeStyle=css("--edge");
+    ctx.beginPath(); ctx.moveTo(x,L.mainTop); ctx.lineTo(x,L.volBot); ctx.stroke();
+    ctx.restore();
+    for(const p of plot){
+      const v=p.a[state.hover]; if(v==null) continue;
+      const y=yAt(v);
+      ctx.fillStyle=surf; ctx.strokeStyle=p.color; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(x,y,4,0,7); ctx.fill(); ctx.stroke();
+    }
+  }
+
+  /* خط جداکنندهٔ پنل‌ها */
+  ctx.strokeStyle=line; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(L.x0,Math.round(L.volTop-7)+.5); ctx.lineTo(L.x1,Math.round(L.volTop-7)+.5);
+  ctx.stroke();
+
+  updateQuote(plot, indexed);
+}
+
+/* ---------- سربرگ عددی ---------- */
+function updateQuote(plot, indexed){
+  const k=state.key, a=DATA[k], m=fa(k);
+  let last=null; for(let i=N-1;i>=0;i--){ if(a[i]!=null){last=i;break;} }
+  document.getElementById("title").textContent =
+    (state.cmpMode && state.compare.length>1) ? "مقایسه سری‌ها (پایه ۱۰۰)" : m.n;
+  if(last==null) return;
+  let prev=null; for(let i=last-1;i>=0;i--){ if(a[i]!=null){prev=i;break;} }
+  const v=a[last], p=prev!=null?a[prev]:null;
+  document.getElementById("qval").textContent=nice(v);
+  const chg=document.getElementById("qchg");
+  if(p!=null && p!==0){
+    const d=v-p, pc=d/Math.abs(p)*100;
+    chg.textContent=`${d>=0?"+":"−"}${nice(Math.abs(d))} (${d>=0?"+":"−"}${Math.abs(pc).toFixed(2)}٪)`;
+    chg.className="chg "+(d>=0?"up":"down");
+  } else { chg.textContent=""; chg.className="chg"; }
+  document.getElementById("qasof").textContent=`${jDate(DATA.d[last])} · ${m.u}`;
+  document.getElementById("count").textContent=
+    `${state.i1-state.i0+1} روز معاملاتی از ${N} · ${jDate(DATA.d[state.i0])} تا ${jDate(DATA.d[state.i1])}`;
+}
+
+/* ---------- راهنمای شناور ---------- */
+function showTip(px,py){
+  const i=state.hover;
+  if(i<0){ tip.style.opacity=0; return; }
+  const keys = state.cmpMode && state.compare.length ? state.compare : [state.key];
+  const S=[css("--s1"),css("--s2"),css("--s3")];
+  let html=`<div class="d">${jDate(DATA.d[i])}</div>`;
+  keys.forEach((k,idx)=>{
+    const m=fa(k), v=DATA[k][i];
+    html+=`<div class="r"><span class="dot" style="background:${S[idx%3]}"></span>`+
+          `<span class="n">${m.n}</span><span class="v">${nice(v)}</span></div>`;
+  });
+  if(!keys.includes("value_retail") && DATA.value_retail[i]!=null)
+    html+=`<div class="r"><span class="dot" style="background:${css("--edge")}"></span>`+
+          `<span class="n">ارزش معاملات</span><span class="v">${nice(DATA.value_retail[i])}</span></div>`;
+  tip.innerHTML=html;
+  tip.style.opacity=1;
+  const r=tip.getBoundingClientRect();
+  let x=px+14; if(x+r.width>W-6) x=px-r.width-14;
+  let y=py-r.height/2; y=Math.max(4,Math.min(H-r.height-4,y));
+  tip.style.left=x+"px"; tip.style.top=y+"px";
+}
+
+/* ---------- تعامل ---------- */
+function clampView(){
+  const minSpan=12;
+  if(state.i1-state.i0<minSpan){
+    const c=(state.i0+state.i1)/2;
+    state.i0=Math.round(c-minSpan/2); state.i1=state.i0+minSpan;
+  }
+  if(state.i0<0){ state.i1-=state.i0; state.i0=0; }
+  if(state.i1>N-1){ state.i0-=(state.i1-(N-1)); state.i1=N-1; }
+  state.i0=Math.max(0,Math.round(state.i0)); state.i1=Math.min(N-1,Math.round(state.i1));
+}
+let drag=null;
+stage.addEventListener("pointerdown",e=>{
+  stage.setPointerCapture(e.pointerId);
+  drag={x:e.offsetX, i0:state.i0, i1:state.i1};
+});
+stage.addEventListener("pointermove",e=>{
+  const L=layout();
+  if(drag){
+    const bars=(e.offsetX-drag.x)/(L.x1-L.x0)*(drag.i1-drag.i0);
+    state.i0=drag.i0+bars; state.i1=drag.i1+bars;
+    clampView(); draw(); return;
+  }
+  const i=Math.round(iAt(e.offsetX,L));
+  state.hover=(i>=state.i0&&i<=state.i1)?i:-1;
+  draw(); showTip(e.offsetX,e.offsetY);
+});
+const endDrag=e=>{ drag=null; };
+stage.addEventListener("pointerup",endDrag);
+stage.addEventListener("pointercancel",endDrag);
+stage.addEventListener("pointerleave",()=>{ drag=null; state.hover=-1; tip.style.opacity=0; draw(); });
+stage.addEventListener("wheel",e=>{
+  e.preventDefault();
+  const L=layout(), anchor=iAt(e.offsetX,L);
+  const f=e.deltaY>0?1.12:1/1.12;
+  state.i0=anchor-(anchor-state.i0)*f;
+  state.i1=anchor+(state.i1-anchor)*f;
+  clampView(); draw();
+},{passive:false});
+stage.addEventListener("dblclick",()=>{ state.i0=0; state.i1=N-1; draw(); });
+
+/* ---------- کنترل‌ها ---------- */
+const seriesRow=document.getElementById("series");
+SERIES.forEach(s=>{
+  const b=document.createElement("button");
+  b.className="chip"; b.type="button"; b.dataset.k=s.k;
+  b.innerHTML=`<span class="dot" style="background:var(--s1)"></span>${s.n}`;
+  b.setAttribute("aria-pressed", s.k===state.key ? "true":"false");
+  b.addEventListener("click",()=>{
+    if(state.cmpMode){
+      const i=state.compare.indexOf(s.k);
+      if(i>=0) state.compare.splice(i,1);
+      else if(state.compare.length<3) state.compare.push(s.k);
+      if(state.compare.length) state.key=state.compare[0];
+    } else {
+      state.key=s.k; state.compare=[s.k];
+    }
+    syncChips(); draw();
+  });
+  seriesRow.appendChild(b);
+});
+function syncChips(){
+  const S=[css("--s1"),css("--s2"),css("--s3")];
+  seriesRow.querySelectorAll(".chip").forEach(b=>{
+    const k=b.dataset.k;
+    const on = state.cmpMode ? state.compare.includes(k) : k===state.key;
+    b.setAttribute("aria-pressed", on?"true":"false");
+    const idx = state.cmpMode ? state.compare.indexOf(k) : 0;
+    b.querySelector(".dot").style.background = on ? S[Math.max(0,idx)%3] : "var(--edge)";
+  });
+  document.getElementById("ma").hidden = state.cmpMode && state.compare.length>1;
+}
+const rangeRow=document.getElementById("ranges");
+RANGES.forEach((r,idx)=>{
+  const b=document.createElement("button");
+  b.type="button"; b.textContent=r.n;
+  b.setAttribute("aria-pressed", r.d===250 ? "true":"false");
+  b.addEventListener("click",()=>{
+    state.i1=N-1;
+    state.i0 = r.d ? Math.max(0,N-r.d) : 0;
+    clampView();
+    rangeRow.querySelectorAll("button").forEach((x,j)=>x.setAttribute("aria-pressed", j===idx?"true":"false"));
+    draw();
+  });
+  rangeRow.appendChild(b);
+});
+document.getElementById("ma").addEventListener("click",e=>{
+  state.showMA=!state.showMA;
+  e.currentTarget.setAttribute("aria-pressed", state.showMA?"true":"false");
+  draw();
+});
+document.getElementById("cmp").addEventListener("click",e=>{
+  state.cmpMode=!state.cmpMode;
+  if(state.cmpMode && state.compare.length<2){
+    state.compare=[state.key, state.key==="index_total"?"index_ew":"index_total"];
+  }
+  e.currentTarget.setAttribute("aria-pressed", state.cmpMode?"true":"false");
+  syncChips(); draw();
+});
+
+/* ---------- راه‌اندازی ---------- */
+new ResizeObserver(resize).observe(stage);
+matchMedia("(prefers-color-scheme:dark)").addEventListener("change",draw);
+new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+document.fonts?.ready?.then(draw);
+state.compare=[state.key];
+syncChips();
+resize();
+
+};
+fetch('data.json?v=' + Date.now())
+  .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+  .then(function(d){ document.getElementById('boot').remove(); window.__boot(d); })
+  .catch(function(e){
+    document.getElementById('boot').textContent =
+      'داده بارگذاری نشد (' + e.message + '). مطمئن شوید data.json کنار همین صفحه است.';
+  });
+</script></body></html>
