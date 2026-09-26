@@ -96,6 +96,42 @@ button{font:inherit;color:inherit}
 .legend .sw.box{width:10px; height:10px; border-radius:2px}
 .legend .note{color:var(--muted); font-size:11.5px}
 
+/* ---- جدول ---- */
+.sheet{
+  flex:1 1 auto; min-height:260px; display:flex; flex-direction:column;
+  background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  box-shadow:var(--shadow); overflow:hidden;
+}
+.sheet-bar{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:8px 12px; border-bottom:1px solid var(--line); background:var(--raised);
+}
+.sheet-bar input{
+  font:inherit; font-size:12.5px; color:var(--ink); background:var(--surface);
+  border:1px solid var(--line); border-radius:7px; padding:4px 9px; width:130px;
+  font-variant-numeric:tabular-nums;
+}
+.sheet-bar .count{font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums}
+.sheet-bar .sep{flex:1 1 auto}
+.sheet-scroll{flex:1 1 auto; overflow:auto; position:relative}
+.sheet table{border-collapse:separate; border-spacing:0; width:max-content; min-width:100%}
+.sheet th,.sheet td{
+  padding:5px 10px; font-size:12.5px; white-space:nowrap; text-align:left;
+  font-variant-numeric:tabular-nums; border-bottom:1px solid var(--line-soft);
+}
+.sheet th{
+  position:sticky; top:0; z-index:2; background:var(--raised); color:var(--ink-2);
+  font-weight:600; text-align:left; border-bottom:1px solid var(--line);
+}
+.sheet th:first-child,.sheet td:first-child{
+  position:sticky; inset-inline-start:0; z-index:1; text-align:right;
+  background:var(--surface); font-weight:600;
+}
+.sheet th:first-child{z-index:3; background:var(--raised)}
+.sheet tbody tr:hover td{background:var(--raised)}
+.sheet td.none{color:var(--muted)}
+.sheet .unit{display:block; font-size:10px; font-weight:400; color:var(--muted)}
+
 /* ---- ناحیه نمودار ---- */
 .stage{
   position:relative; flex:1 1 auto; min-height:260px;
@@ -151,7 +187,7 @@ button{font:inherit;color:inherit}
     <div class="row"><div class="seg views" id="views"></div></div>
     <div class="row" id="series"></div>
     <div class="row legend" id="legend" hidden></div>
-    <div class="row">
+    <div class="row" id="rangeRow">
       <span class="label">بازه</span>
       <div class="seg" id="ranges"></div>
       <span class="sep"></span>
@@ -163,6 +199,19 @@ button{font:inherit;color:inherit}
   <div class="stage" id="stage">
     <canvas id="cv"></canvas>
     <div class="tip" id="tip"></div>
+  </div>
+
+  <div class="sheet" id="sheet" hidden>
+    <div class="sheet-bar">
+      <label class="label" for="jump">برو به تاریخ</label>
+      <input id="jump" type="text" inputmode="numeric" placeholder="14050701" autocomplete="off">
+      <span class="count" id="sheetCount"></span>
+      <span class="sep"></span>
+      <button class="chip" id="csv">دریافت CSV</button>
+    </div>
+    <div class="sheet-scroll" id="sheetScroll">
+      <table id="sheetTable"><thead id="sheetHead"></thead><tbody id="sheetBody"></tbody></table>
+    </div>
   </div>
 
   <div class="foot">
@@ -184,9 +233,16 @@ const SERIES = [
   {k:"index_ew",     n:"شاخص هم‌وزن",           u:"واحد",          ma:[50,200], dec:0},
   {k:"value_retail", n:"ارزش معاملات خرد",      u:"میلیارد تومان", ma:[7,21],   dec:0},
   {k:"flow_retail",  n:"ورود پول حقیقی",        u:"میلیارد تومان", ma:[7,21],   dec:0, signed:true},
-  {k:"mv",           n:"ارزش بازار",            u:"همت",           ma:[50,200], dec:0},
+  {k:"mv",           n:"ارزش کل بازار",         u:"همت",           ma:[50,200], dec:0},
+  {k:"mv_tse",       n:"ارزش بورس",             u:"همت",           ma:[50,200], dec:0, hide:true},
+  {k:"mv_ifb",       n:"ارزش فرابورس",          u:"همت",           ma:[50,200], dec:0, hide:true},
+  {k:"mv_usd",       n:"ارزش دلاری بازار",      u:"میلیارد دلار",  ma:[50,200], dec:1},
+  {k:"usd_rate",     n:"نرخ دلار",              u:"تومان",         ma:[50,200], dec:0},
+  {k:"gold18",       n:"طلای ۱۸ عیار",          u:"تومان بر گرم",  ma:[50,200], dec:0},
+  {k:"mv_gold",      n:"ارزش بازار به طلا",     u:"تن طلا",        ma:[50,200], dec:0},
+  {k:"pe",           n:"P/E کل بازار",          u:"",              ma:[50,200], dec:2, hide:true},
   {k:"m2",           n:"نقدینگی M2",            u:"همت",           ma:[50,200], dec:0},
-  {k:"ratio",        n:"ارزش بازار به نقدینگی", u:"نسبت",          ma:[50,200], dec:3},
+  {k:"ratio",        n:"ارزش بازار به نقدینگی", u:"نسبت",          ma:[50,200], dec:3, hide:true},
 ];
 
 /* هر «نما» یک چیدمان آماده است: سری اصلی، میانگین‌ها، و پنل پایین. */
@@ -198,6 +254,12 @@ const VIEWS = [
   {id:"value",   tab:"ارزش معاملات", key:"value_retail", ema:[7,28], panel:"flow",
    title:"ارزش معاملات خرد",
    note:"پنل پایین: خالص ورود پول حقیقی هر روز"},
+  {id:"mv",      tab:"ارزش بازار", key:"mv", lines:["mv_tse","mv_ifb","mv"],
+   panel:"none", title:"ارزش بازار", note:"همت"},
+  {id:"gold",    tab:"بازار به طلا", key:"mv_gold", ema:[28,110], panel:"none",
+   title:"ارزش بازار بر حسب طلا",
+   note:"ارزش کل بازار ÷ قیمت یک گرم طلای ۱۸ عیار — بر حسب تن"},
+  {id:"sheet",   tab:"جدول", sheet:true, title:"جدول داده‌ها"},
 ];
 
 const RANGES = [
@@ -285,7 +347,11 @@ const stage=document.getElementById("stage"), cv=document.getElementById("cv");
 const ctx=cv.getContext("2d"), tip=document.getElementById("tip");
 let W=0,H=0,DPR=1;
 const PAD={t:14,r:62,b:26,l:12};
-function pad(){ return {...PAD, r: W<560?52:62}; }
+/* پهنای ستون برچسب‌های محور عمودی. قیمت طلا هشت‌رقمی است و در ۶۲ پیکسل جا
+   نمی‌شود؛ پس بعد از اندازه‌گیریِ پهن‌ترین برچسب، یک بار دوباره چیده می‌شود. */
+let GUTTER = 62;
+let relaying = false;
+function pad(){ return {...PAD, r: Math.max(W<560?52:62, GUTTER)}; }
 const PANEL_H=0.22;             // سهم پنل پایین از ارتفاع
 
 function resize(){
@@ -300,7 +366,7 @@ function resize(){
 /* ---------- چیدمان ---------- */
 function layout(){
   const P=pad();
-  const hasPanel = view().panel!=="none";
+  const hasPanel = !view().sheet && view().panel!=="none";
   if(!hasPanel){
     return {x0:P.l, x1:W-P.r, mainTop:P.t, mainBot:H-P.b, panelTop:null, panelBot:H-P.b, hasPanel:false};
   }
@@ -330,14 +396,34 @@ function roundRectPath(x,y,w,h,r){
 /* چه چیزی در این نما رسم می‌شود */
 function plan(){
   const V=view();
+  if(V.sheet) return {keys:[state.key], indexed:false, ma:null, panel:"none"};
+  if(V.lines) return {keys:V.lines, indexed:false, ma:null, panel:V.panel};
   if(!V.free) return {keys:[V.key], indexed:false, ma:V.ema, maKind:"ema", panel:V.panel};
   const keys = state.cmpMode && state.compare.length ? state.compare : [state.key];
   return {keys, indexed:keys.length>1,
           ma: state.showMA ? fa(state.key).ma : null, maKind:"sma", panel:"volume"};
 }
 
+/* سری‌ها هم‌طول نیستند: ارزش بازار روزهایی داده دارد که شاخص ندارد و برعکس.
+   اگر برای هر نقطهٔ خالی قلم را برداریم، خط خط‌چین‌خط‌چین می‌شود. پس حفره‌های
+   کوتاه (چند ردیف) وصل می‌شوند و فقط حفره‌های واقعی — مثل نبودِ سه‌سالهٔ داده —
+   خط را می‌شکنند. */
+const MAX_HOLE = 6;
+function strokeSeries(a, L, yAt){
+  ctx.beginPath();
+  let prev = -1;
+  for(let i=state.i0;i<=state.i1;i++){
+    const v=a[i]; if(v==null) continue;
+    const x=xAt(i,L), y=yAt(v);
+    if(prev<0 || i-prev>MAX_HOLE) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    prev=i;
+  }
+  ctx.stroke();
+}
+
 /* ---------- ترسیم ---------- */
 function draw(){
+  if(view().sheet) return;
   const L=layout(), V=view(), PL=plan();
   const muted=css("--muted"), line=css("--line"), soft=css("--line-soft"), surf=css("--surface");
   const S=[css("--s1"),css("--s2"),css("--s3")];
@@ -382,11 +468,21 @@ function draw(){
   ctx.strokeStyle=soft; ctx.lineWidth=1;
   ctx.fillStyle=muted; ctx.textAlign="left";
   const dec = indexed ? 0 : plot[0].meta.dec;
+  let widest=0;
   for(const t of ticks(lo,hi,5)){
     const y=Math.round(yAt(t))+.5;
     if(y<L.mainTop||y>L.mainBot) continue;
+    const lab = indexed ? t.toFixed(0) : nice(t,dec);
+    widest = Math.max(widest, ctx.measureText(lab).width);
     ctx.beginPath(); ctx.moveTo(L.x0,y); ctx.lineTo(L.x1,y); ctx.stroke();
-    ctx.fillText(indexed?t.toFixed(0):nice(t,dec), L.x1+7, y);
+    ctx.fillText(lab, L.x1+7, y);
+  }
+  /* اگر برچسب‌ها در ستون فعلی جا نمی‌شوند، ستون را پهن کن و یک بار دوباره بکش */
+  const want = Math.max(W<560?52:62, Math.ceil(widest)+12);
+  if(!relaying && Math.abs(want-GUTTER)>1){
+    GUTTER = want; relaying = true;
+    try { draw(); } finally { relaying = false; }
+    return;
   }
 
   /* خط صفر برای سری‌های دوعلامته */
@@ -473,32 +569,25 @@ function draw(){
   for(const m of mas){
     ctx.strokeStyle=m.color; ctx.lineWidth=1.5;
     ctx.lineJoin="round"; ctx.lineCap="round";
-    ctx.beginPath(); let pen=false;
-    for(let i=state.i0;i<=state.i1;i++){
-      const v=m.a[i]; if(v==null){pen=false;continue;}
-      const x=xAt(i,L), y=yAt(v);
-      pen?ctx.lineTo(x,y):ctx.moveTo(x,y); pen=true;
-    }
-    ctx.stroke();
+    strokeSeries(m.a, L, yAt);
   }
 
   /* ---- خطوط اصلی ---- */
   for(const p of plot){
     ctx.strokeStyle=p.color; ctx.lineWidth=2;
     ctx.lineJoin="round"; ctx.lineCap="round";
-    ctx.beginPath(); let pen=false;
-    for(let i=state.i0;i<=state.i1;i++){
-      const v=p.a[i]; if(v==null){pen=false;continue;}
-      const x=xAt(i,L), y=yAt(v);
-      pen?ctx.lineTo(x,y):ctx.moveTo(x,y); pen=true;
-    }
-    ctx.stroke();
+    strokeSeries(p.a, L, yAt);
 
     let last=null; for(let i=state.i1;i>=state.i0;i--){ if(p.a[i]!=null){last=i;break;} }
     if(last!=null){
       const x=xAt(last,L), y=yAt(p.a[last]);
       ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(x,y,3,0,7); ctx.fill();
-      if(indexed){ ctx.textAlign="right"; ctx.fillText(p.meta.n, x-8, y); }
+      /* برچسب انتهای خط فقط وقتی جا دارد؛ وگرنه راهنمای بالای نمودار کافی است */
+      if(indexed || plot.length>1){
+        ctx.textAlign="right";
+        const w=ctx.measureText(p.meta.n).width;
+        if(x-10-w > L.x0+4) ctx.fillText(p.meta.n, x-10, y);
+      }
     }
   }
 
@@ -568,6 +657,27 @@ function showTip(px,py){
   if(i<0){ tip.style.opacity=0; return; }
   const PL=plan(), S=[css("--s1"),css("--s2"),css("--s3")];
   let html=`<div class="d">${jDate(DATA.d[i])}</div>`;
+
+  if(view().lines){
+    const t=DATA.mv_tse[i], f=DATA.mv_ifb[i];
+    const row=(c,n,v)=>`<div class="r"><span class="dot" style="background:${c}"></span>`+
+                       `<span class="n">${n}</span><span class="v">${nice(v,0)}</span></div>`;
+    html+=row(S[0],"ارزش بورس",t)+row(S[1],"ارزش فرابورس",f);
+    if(t!=null && f!=null){
+      html+=row(S[2],"ارزش کل بازار",t+f);
+      html+=`<div class="r"><span class="dot" style="background:transparent"></span>`+
+            `<span class="n">سهم فرابورس</span>`+
+            `<span class="v">${(f/(t+f)*100).toFixed(1)}٪</span></div>`;
+    }
+    tip.innerHTML=html;
+    tip.style.opacity=1;
+    const r0=tip.getBoundingClientRect();
+    let x0=px+14; if(x0+r0.width>W-6) x0=px-r0.width-14;
+    let y0=py-r0.height/2; y0=Math.max(4,Math.min(H-r0.height-4,y0));
+    tip.style.left=x0+"px"; tip.style.top=y0+"px";
+    return;
+  }
+
   PL.keys.forEach((k,idx)=>{
     const m=fa(k), v=DATA[k][i];
     html+=`<div class="r"><span class="dot" style="background:${S[idx%3]}"></span>`+
@@ -647,7 +757,9 @@ VIEWS.forEach(v=>{
 });
 
 const seriesRow=document.getElementById("series");
-SERIES.forEach(s=>{
+/* سری‌هایی با hide:true چیپ نمی‌گیرند — اجزای ارزش بازار و نسبت نقدینگی
+   تب اختصاصی خودشان را دارند و اینجا فقط شلوغی می‌سازند. */
+SERIES.filter(s=>!s.hide).forEach(s=>{
   const b=document.createElement("button");
   b.className="chip"; b.type="button"; b.dataset.k=s.k;
   b.innerHTML=`<span class="dot" style="background:var(--s1)"></span>${s.n}`;
@@ -677,9 +789,12 @@ RANGES.forEach((r,idx)=>{
 function markRange(idx){
   rangeRow.querySelectorAll("button").forEach((x,j)=>x.setAttribute("aria-pressed", j===idx?"true":"false"));
 }
-/* بازه به آخرین روزی ختم می‌شود که سری جاری داده دارد، نه آخرین روز جدول */
+/* بازه به آخرین روزی ختم می‌شود که سری جاری داده دارد، نه آخرین روز جدول.
+   سری‌ها هم‌طول نیستند — ارزش بازار تا امروز می‌آید، شاخص‌ها چند روز عقب‌ترند —
+   و بدون این، سمت راست نمودار خالی می‌ماند. */
 function applyRange(d){
-  const end = view().free ? N-1 : lastValid(state.key);
+  const keys = (state.cmpMode && state.compare.length) ? state.compare : [state.key];
+  const end = Math.max(...keys.map(lastValid));
   state.i1=end;
   state.i0 = d ? Math.max(0,end-d+1) : 0;
   clampView();
@@ -688,6 +803,19 @@ function applyRange(d){
 function setView(id){
   state.view=id;
   const V=view();
+  const isSheet = !!V.sheet;
+  stage.hidden = isSheet;
+  sheetEl.hidden = !isSheet;
+  document.getElementById("rangeRow").hidden = isSheet;
+  document.querySelector(".foot").hidden = isSheet;
+  document.getElementById("title").textContent = V.title || "";
+  if(isSheet){
+    viewsRow.querySelectorAll("button").forEach(b=>
+      b.setAttribute("aria-pressed", b.dataset.v===id?"true":"false"));
+    syncChips();
+    renderSheet();
+    return;
+  }
   if(!V.free){ state.key=V.key; state.compare=[V.key]; state.cmpMode=false; }
   viewsRow.querySelectorAll("button").forEach(b=>
     b.setAttribute("aria-pressed", b.dataset.v===id?"true":"false"));
@@ -713,6 +841,13 @@ document.getElementById("cmp").addEventListener("click",e=>{
 const legendRow=document.getElementById("legend");
 function syncChips(){
   const V=view(), S=[css("--s1"),css("--s2"),css("--s3")];
+  if(V.sheet){
+    seriesRow.hidden = legendRow.hidden = true;
+    document.getElementById("cmp").hidden = document.getElementById("ma").hidden = true;
+    document.querySelector(".quote").hidden = true;
+    return;
+  }
+  document.querySelector(".quote").hidden = false;
   const free=!!V.free;
 
   seriesRow.hidden = !free;
@@ -729,16 +864,110 @@ function syncChips(){
 
   legendRow.hidden = free;
   if(free) return;
-  const items=[[S[0],fa(V.key).n,"line"]];
-  V.ema.forEach((p,j)=>items.push([S[(j+1)%3],"EMA "+pnum(p),"line"]));
+  const items=[]; const note=V.note;
+  if(V.lines){
+    V.lines.forEach((k,j)=>items.push([S[j%3], fa(k).n, "line"]));
+  } else {
+    items.push([S[0],fa(V.key).n,"line"]);
+    (V.ema||[]).forEach((p,j)=>items.push([S[(j+1)%3],"EMA "+pnum(p),"line"]));
+  }
   if(V.panel==="flow"){
     items.push([css("--up"),"ورود پول (مثبت)","box"]);
     items.push([css("--down"),"خروج پول (منفی)","box"]);
   }
   legendRow.innerHTML = items.map(([c,n,kind])=>
     `<span class="it"><span class="sw${kind==="box"?" box":""}" style="background:${c}"></span>${n}</span>`
-  ).join("") + (V.note?`<span class="note">${V.note}</span>`:"");
+  ).join("") + (note?`<span class="note">${note}</span>`:"");
+
+
 }
+
+
+
+/* ================= جدول داده‌ها =================
+   ۷٬۷۲۱ ردیف در DOM مرورگر را می‌خواباند، پس فقط ردیف‌های داخل دید ساخته
+   می‌شوند و بقیه با یک فاصله‌گذارِ ارتفاع‌دار شبیه‌سازی می‌شوند. */
+const SHEET_COLS = SERIES.filter(s => DATA[s.k]);
+const ROW_H = 27;
+const sheetEl = document.getElementById("sheet");
+const scrollEl = document.getElementById("sheetScroll");
+const bodyEl = document.getElementById("sheetBody");
+const headEl = document.getElementById("sheetHead");
+
+/* جدیدترین روز بالا — چیزی که معمولاً دنبالش هستید */
+const SHEET_ROWS = Array.from({length:N}, (_,i)=>N-1-i);
+
+headEl.innerHTML = "<tr><th>تاریخ</th>" + SHEET_COLS.map(c =>
+  `<th>${c.n}<span class="unit">${c.u||"—"}</span></th>`).join("") + "</tr>";
+document.getElementById("sheetCount").textContent =
+  `${N.toLocaleString("en-US")} روز · ${jDate(DATA.d[0])} تا ${jDate(DATA.d[N-1])}`;
+
+function renderSheet(){
+  const top = scrollEl.scrollTop, h = scrollEl.clientHeight;
+  const first = Math.max(0, Math.floor(top/ROW_H) - 8);
+  const last  = Math.min(SHEET_ROWS.length, Math.ceil((top+h)/ROW_H) + 8);
+  const pad = i => `<tr style="height:${i*ROW_H}px"><td colspan="${SHEET_COLS.length+1}"></td></tr>`;
+  let html = first ? pad(first) : "";
+  for(let r=first;r<last;r++){
+    const i = SHEET_ROWS[r];
+    html += `<tr><td>${jDate(DATA.d[i])}</td>` + SHEET_COLS.map(c=>{
+      const v = DATA[c.k][i];
+      return v==null ? '<td class="none">—</td>' : `<td>${nice(v, c.dec)}</td>`;
+    }).join("") + "</tr>";
+  }
+  const restRows = SHEET_ROWS.length - last;
+  if(restRows>0) html += pad(restRows);
+  bodyEl.innerHTML = html;
+}
+scrollEl.addEventListener("scroll", ()=>{ if(view().sheet) renderSheet(); });
+
+/* پریدن به یک تاریخ */
+document.getElementById("jump").addEventListener("input", e=>{
+  const q = e.target.value.replace(/[^0-9]/g,"");
+  if(q.length<4) return;
+  /* تاریخ تایپ‌شده ممکن است اصلاً روز معاملاتی نباشد؛ پس نزدیک‌ترین روزِ
+     همان تاریخ یا قبل از آن پیدا می‌شود. ردیف‌ها نزولی‌اند، پس اولین
+     تاریخی که کوچک‌تر یا مساوی باشد همان است. */
+  const key = (q + "00000000").slice(0,8);
+  let hit = SHEET_ROWS.findIndex(i => DATA.d[i] <= (q.length>=8 ? q : key.slice(0,q.length)+"99999999".slice(q.length)));
+  if(hit<0) hit = SHEET_ROWS.length-1;
+  scrollEl.scrollTop = hit*ROW_H;
+  renderSheet();
+});
+
+/* خروجی CSV — با BOM تا اکسل فارسی را درست بخواند.
+   صفحه در دو جا اجرا می‌شود: روی گیت‌هاب (لینک دانلود معمولی کار می‌کند) و
+   داخل نمایشگر Artifact (که لینک دانلود را نمی‌پذیرد و قابلیت downloads دارد).
+   پس اول مسیر Artifact امتحان می‌شود و اگر نبود، مسیر مرورگر. */
+function buildCsv(){
+  const head = ["تاریخ", ...SHEET_COLS.map(c=>`${c.n} (${c.u||"-"})`)].join(",");
+  const lines = [head];
+  for(let i=0;i<N;i++){
+    lines.push([DATA.d[i], ...SHEET_COLS.map(c=>{
+      const v=DATA[c.k][i]; return v==null ? "" : v;
+    })].join(","));
+  }
+  return "\uFEFF" + lines.join("\n");
+}
+
+const csvBtn = document.getElementById("csv");
+csvBtn.addEventListener("click", async ()=>{
+  const filename = `bourse_${DATA.d[N-1]}.csv`;
+  const text = buildCsv();
+  csvBtn.disabled = true;
+  try{
+    const dl = window.claude?.use ? await window.claude.use("downloads") : null;
+    if(dl){
+      try { await dl.save({filename, data:text}); }
+      catch(err){ if(err?.code && err.code!=="declined") console.warn("downloads:", err.code); }
+      return;
+    }
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([text],{type:"text/csv;charset=utf-8"}));
+    a.download=filename; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  } finally { csvBtn.disabled=false; }
+});
 
 /* ---------- راه‌اندازی ---------- */
 new ResizeObserver(resize).observe(stage);
