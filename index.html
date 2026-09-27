@@ -5,7 +5,7 @@
   --ground:#fbfbf9; --surface:#ffffff; --raised:#f4f4f0;
   --ink:#14150f; --ink-2:#4d4f46; --muted:#82857a;
   --line:#e4e4dd; --line-soft:#eeeee8; --edge:#cfd0c7;
-  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#a855c7; --s5:#b8860b;
   --up:#0ca30c; --down:#d03b3b;
   --focus:#2a78d6;
   --shadow:0 1px 2px rgba(20,21,15,.06),0 8px 24px rgba(20,21,15,.07);
@@ -15,7 +15,7 @@
     --ground:#131410; --surface:#1b1c18; --raised:#232420;
     --ink:#f3f3ee; --ink-2:#c6c8bd; --muted:#8f9287;
     --line:#2b2d27; --line-soft:#232520; --edge:#3a3c35;
-    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#a855c7; --s5:#b8860b;
     --up:#2fb92f; --down:#e05c5c;
     --focus:#3987e5;
     --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.45);
@@ -25,7 +25,7 @@
   --ground:#131410; --surface:#1b1c18; --raised:#232420;
   --ink:#f3f3ee; --ink-2:#c6c8bd; --muted:#8f9287;
   --line:#2b2d27; --line-soft:#232520; --edge:#3a3c35;
-  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#a855c7; --s5:#b8860b;
   --up:#2fb92f; --down:#e05c5c;
   --focus:#3987e5;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.45);
@@ -45,7 +45,7 @@ button{font:inherit;color:inherit}
 .app{
   height:100%; display:flex; flex-direction:column;
   padding-inline:16px; padding-block:14px 12px; gap:12px;
-  max-width:1400px; margin:0 auto;
+  max-width:none; margin:0 auto;
 }
 
 /* ---- سربرگ ---- */
@@ -84,6 +84,21 @@ button{font:inherit;color:inherit}
 .seg button:first-child{border-inline-start:0}
 .seg button[aria-pressed="true"]{background:var(--raised); color:var(--ink); font-weight:600}
 .label{font-size:11.5px; color:var(--muted); margin-inline-end:2px}
+
+/* ---- نوار میانگین متحرک ---- */
+#rsiInput{width:70px; text-align:center}
+.ma-input{
+  font:inherit; font-size:12.5px; color:var(--ink); background:var(--surface);
+  border:1px solid var(--line); border-radius:8px; padding:4px 10px; width:150px;
+  font-variant-numeric:tabular-nums; direction:ltr; text-align:right;
+}
+.ma-input::placeholder{color:var(--muted)}
+.ma-swatches{display:inline-flex; gap:10px; align-items:center; flex-wrap:wrap}
+.ma-swatches .it{
+  display:inline-flex; align-items:center; gap:5px;
+  font-size:12px; color:var(--ink-2); font-variant-numeric:tabular-nums;
+}
+.ma-swatches i{width:14px; height:3px; border-radius:2px; display:block; flex:none}
 
 /* ---- سوییچ نما ---- */
 .seg.views button{padding:7px 15px; font-size:13px; font-weight:500}
@@ -159,7 +174,12 @@ button{font:inherit;color:inherit}
 }
 
 @media (max-width:720px){
-  .app{padding-inline:12px}
+  /* روی موبایل کنترل‌ها چند سطر می‌شوند؛ نگذار نمودار له شود — صفحه اسکرول کند */
+  html,body{height:auto}
+  .app{padding-inline:12px; height:auto; min-height:100%}
+  .stage{min-height:340px}
+  .ma-input{width:120px}
+  #rsiInput{width:64px}
   .quote .val{font-size:22px}
   .brand h1{font-size:16px}
   .chip{padding:5px 10px; font-size:12px}
@@ -191,8 +211,24 @@ button{font:inherit;color:inherit}
       <span class="label">بازه</span>
       <div class="seg" id="ranges"></div>
       <span class="sep"></span>
-      <button class="chip" id="ma" aria-pressed="false">میانگین متحرک</button>
       <button class="chip" id="cmp" aria-pressed="false">مقایسه (پایه ۱۰۰)</button>
+      <button class="chip" id="fs">تمام‌صفحه</button>
+    </div>
+    <div class="row" id="maRow">
+      <span class="label">میانگین</span>
+      <div class="seg" id="maKind">
+        <button type="button" data-k="ema" aria-pressed="true">EMA</button>
+        <button type="button" data-k="sma" aria-pressed="false">SMA</button>
+      </div>
+      <input class="ma-input" id="maInput" type="text" inputmode="numeric"
+             autocomplete="off" placeholder="۵۰، ۲۰۰">
+      <span class="ma-swatches" id="maSwatches"></span>
+      <span class="sep"></span>
+      <button class="chip" id="rsiBtn" aria-pressed="false">
+        <span class="dot" id="rsiDot"></span>RSI
+      </button>
+      <input class="ma-input" id="rsiInput" type="text" inputmode="numeric"
+             autocomplete="off" placeholder="۱۴" hidden>
     </div>
   </div>
 
@@ -272,14 +308,18 @@ const state = {
   view:"explore",
   key:"index_total",
   compare:[],           // کلیدهای سری در حالت مقایسه
-  showMA:false,
   cmpMode:false,
+  maKind:"ema",
+  rsi:{},              // نما -> دورهٔ RSI، یا null یعنی خاموش
+  ma:{},               // نما -> فهرست دوره‌ها؛ با پیش‌فرض همان نما پر می‌شود
   i0:Math.max(0,N-250), i1:N-1,
   hover:-1,
 };
 
 /* ---------- ابزارها ---------- */
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const PAL = () => [css("--s1"),css("--s2"),css("--s3"),css("--s4"),css("--s5")];
+const MAX_MA = 4;
 const fa  = k => SERIES.find(s=>s.k===k);
 const view = () => VIEWS.find(v=>v.id===state.view);
 const jDate = j => `${j.slice(0,4)}/${j.slice(4,6)}/${j.slice(6)}`;
@@ -335,6 +375,37 @@ function ema(arr,span){
   }
   return out;
 }
+/* شاخص قدرت نسبی، به روش وایلدر.
+   روزهای بی‌داده رد می‌شوند و مرجعِ تفاضل، آخرین مقدار معتبر است — نه صفر.
+   تا وقتی «period» تفاضل واقعی جمع نشده خروجی نمی‌دهد. */
+function rsiOf(arr, period){
+  const out=new Array(arr.length).fill(null);
+  let prev=null, ag=0, al=0, seen=0;
+  for(let i=0;i<arr.length;i++){
+    const v=arr[i];
+    if(v==null) continue;
+    if(prev==null){ prev=v; continue; }
+    const d=v-prev; prev=v;
+    const gain=d>0?d:0, loss=d<0?-d:0;
+    seen++;
+    if(seen<=period){
+      ag+=gain/period; al+=loss/period;
+      if(seen===period) out[i] = al===0 ? 100 : 100 - 100/(1+ag/al);
+    } else {
+      ag=(ag*(period-1)+gain)/period;
+      al=(al*(period-1)+loss)/period;
+      out[i] = al===0 ? 100 : 100 - 100/(1+ag/al);
+    }
+  }
+  return out;
+}
+
+/* دورهٔ RSI نمای جاری — null یعنی خاموش */
+function rsiPeriod(){
+  const id=state.view;
+  return (id in state.rsi) ? state.rsi[id] : null;
+}
+
 /* آخرین روزی که این سری داده دارد */
 function lastValid(k){
   const a=DATA[k]; if(!a) return N-1;
@@ -352,7 +423,8 @@ const PAD={t:14,r:62,b:26,l:12};
 let GUTTER = 62;
 let relaying = false;
 function pad(){ return {...PAD, r: Math.max(W<560?52:62, GUTTER)}; }
-const PANEL_H=0.22;             // سهم پنل پایین از ارتفاع
+const PANEL_H=0.20;             // سهم پنل سری از ارتفاع
+const RSI_H=0.20;               // سهم پنل RSI
 
 function resize(){
   const r=stage.getBoundingClientRect();
@@ -366,15 +438,26 @@ function resize(){
 /* ---------- چیدمان ---------- */
 function layout(){
   const P=pad();
-  const hasPanel = !view().sheet && view().panel!=="none";
-  if(!hasPanel){
-    return {x0:P.l, x1:W-P.r, mainTop:P.t, mainBot:H-P.b, panelTop:null, panelBot:H-P.b, hasPanel:false};
+  const V=view();
+  const hasPanel = !V.sheet && plan().panel!=="none";
+  const hasRsi   = !V.sheet && rsiPeriod()!=null;
+  const inner = H-P.t-P.b;
+
+  /* از پایین به بالا چیده می‌شود: RSI پایین‌ترین، بعد پنل سری، بعد نمودار اصلی */
+  let bot = H-P.b;
+  let rsiTop=null, rsiBot=null, panelTop=null, panelBot=null;
+  if(hasRsi){
+    rsiBot=bot; rsiTop=bot-Math.round(inner*RSI_H); bot=rsiTop-14;
   }
-  const panelTop = H-P.b-Math.round((H-P.t-P.b)*PANEL_H);
+  if(hasPanel){
+    panelBot=bot; panelTop=bot-Math.round(inner*PANEL_H); bot=panelTop-14;
+  }
   return {
     x0:P.l, x1:W-P.r,
-    mainTop:P.t, mainBot:panelTop-14,
-    panelTop, panelBot:H-P.b, hasPanel:true,
+    mainTop:P.t, mainBot:bot,
+    panelTop, panelBot, hasPanel,
+    rsiTop, rsiBot, hasRsi,
+    bottom: rsiBot ?? panelBot ?? (H-P.b),
   };
 }
 const xAt = (i,L) => L.x0 + (i-state.i0)/Math.max(1,(state.i1-state.i0)) * (L.x1-L.x0);
@@ -393,15 +476,31 @@ function roundRectPath(x,y,w,h,r){
   else ctx.rect(x,y,w,h);
 }
 
+/* پنل میله‌ای ارزش معاملات زیر این سری‌ها چیزی اضافه نمی‌کند:
+   یا خودشان همان ارزش معاملات‌اند، یا اصلاً ربطی به حجم معاملات بورس ندارند
+   (طلا، دلار، نقدینگی). پس آنجا پنل پایین حذف می‌شود و نمودار تمام‌قد است. */
+const NO_VOLUME = new Set(["value_retail","mv_usd","usd_rate","gold18","mv_gold","m2"]);
+
+/* دوره‌های میانگین برای نمای جاری. خالی یعنی هیچ میانگینی. */
+function maPeriods(){
+  const id=state.view;
+  if(!(id in state.ma)) state.ma[id] = (view().ema || []).slice();
+  return state.ma[id];
+}
+
 /* چه چیزی در این نما رسم می‌شود */
 function plan(){
   const V=view();
   if(V.sheet) return {keys:[state.key], indexed:false, ma:null, panel:"none"};
-  if(V.lines) return {keys:V.lines, indexed:false, ma:null, panel:V.panel};
-  if(!V.free) return {keys:[V.key], indexed:false, ma:V.ema, maKind:"ema", panel:V.panel};
+  if(V.lines) return {keys:V.lines, indexed:false, ma:maPeriods(), maKind:state.maKind, panel:V.panel};
+  if(!V.free) return {keys:[V.key], indexed:false, ma:maPeriods(),
+                      maKind:state.maKind, panel:V.panel};
   const keys = state.cmpMode && state.compare.length ? state.compare : [state.key];
-  return {keys, indexed:keys.length>1,
-          ma: state.showMA ? fa(state.key).ma : null, maKind:"sma", panel:"volume"};
+  const indexed = keys.length>1;
+  const showVol = !keys.every(k => NO_VOLUME.has(k));
+  return {keys, indexed,
+          ma: indexed ? null : maPeriods(), maKind:state.maKind,
+          panel: showVol ? "volume" : "none"};
 }
 
 /* سری‌ها هم‌طول نیستند: ارزش بازار روزهایی داده دارد که شاخص ندارد و برعکس.
@@ -426,7 +525,7 @@ function draw(){
   if(view().sheet) return;
   const L=layout(), V=view(), PL=plan();
   const muted=css("--muted"), line=css("--line"), soft=css("--line-soft"), surf=css("--surface");
-  const S=[css("--s1"),css("--s2"),css("--s3")];
+  const S=PAL();
   const up=css("--up"), down=css("--down");
 
   ctx.clearRect(0,0,W,H);
@@ -447,8 +546,10 @@ function draw(){
   });
 
   /* میانگین‌ها — قبل از محاسبهٔ بازهٔ عمودی، تا از کادر بیرون نزنند */
-  const mas = (!indexed && PL.ma)
-    ? PL.ma.map((p,j)=>({p, a:(PL.maKind==="ema"?ema:movingAvg)(plot[0].a,p), color:S[(j+1)%3]}))
+  const mas = (!indexed && PL.ma && PL.ma.length)
+    ? PL.ma.slice(0,MAX_MA).map((p,j)=>({
+        p, a:(PL.maKind==="ema"?ema:movingAvg)(plot[0].a,p),
+        color:S[(j+1)%S.length]}))
     : [];
 
   /* بازهٔ عمودی پنل اصلی */
@@ -497,7 +598,7 @@ function draw(){
   for(let i=Math.max(1,state.i0);i<=state.i1;i++){
     if(gapDays(i)>10){
       const x=Math.round(xAt(i-0.5,L))+.5;
-      ctx.beginPath(); ctx.moveTo(x,L.mainTop); ctx.lineTo(x,L.panelBot); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x,L.mainTop); ctx.lineTo(x,L.bottom); ctx.stroke();
     }
   }
   ctx.restore();
@@ -565,6 +666,43 @@ function draw(){
     ctx.font='11px Vazirmatn,system-ui,sans-serif';
   }
 
+  /* ---- پنل RSI ---- */
+  if(L.hasRsi){
+    const period = rsiPeriod();
+    const r = rsiOf(plot[0].a, period);
+    const ry = v => L.rsiBot - (v/100)*(L.rsiBot-L.rsiTop);
+
+    /* نوار ۳۰ تا ۷۰: جایی که هیچ سیگنالی نیست */
+    ctx.save(); ctx.globalAlpha=.05; ctx.fillStyle=css("--ink");
+    ctx.fillRect(L.x0, ry(70), L.x1-L.x0, ry(30)-ry(70)); ctx.restore();
+
+    ctx.save(); ctx.setLineDash([3,3]); ctx.strokeStyle=css("--edge"); ctx.lineWidth=1;
+    for(const lv of [30,70]){
+      const y=Math.round(ry(lv))+.5;
+      ctx.beginPath(); ctx.moveTo(L.x0,y); ctx.lineTo(L.x1,y); ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.strokeStyle=S[3]; ctx.lineWidth=1.5;
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    strokeSeries(r, L, ry);
+
+    ctx.fillStyle=muted; ctx.textAlign="left";
+    ctx.font='10px Vazirmatn,system-ui,sans-serif';
+    for(const lv of [30,70]) ctx.fillText(String(lv), L.x1+7, ry(lv));
+    ctx.textAlign="right";
+    if(W>=560) ctx.fillText(`RSI ${pnum(period)}`, L.x1-6, L.rsiTop+7);
+    ctx.font='11px Vazirmatn,system-ui,sans-serif';
+
+    /* خط جداکننده بالای پنل */
+    ctx.strokeStyle=line; ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(L.x0,Math.round(L.rsiTop-7)+.5); ctx.lineTo(L.x1,Math.round(L.rsiTop-7)+.5);
+    ctx.stroke();
+
+    window.__rsi = {a:r, period};
+  } else window.__rsi = null;
+
   /* ---- میانگین‌های متحرک ---- */
   for(const m of mas){
     ctx.strokeStyle=m.color; ctx.lineWidth=1.5;
@@ -600,14 +738,14 @@ function draw(){
     const d=DATA.d[i], lab=`${d.slice(0,4)}/${d.slice(4,6)}`;
     if(lab===prev) continue; prev=lab;
     const x=xAt(i,L);
-    if(x>L.x0+18 && x<L.x1-18) ctx.fillText(lab, x, L.panelBot+13);
+    if(x>L.x0+18 && x<L.x1-18) ctx.fillText(lab, x, L.bottom+13);
   }
 
   /* نشانگر متقاطع */
   if(state.hover>=state.i0 && state.hover<=state.i1){
     const x=Math.round(xAt(state.hover,L))+.5;
     ctx.save(); ctx.setLineDash([3,3]); ctx.strokeStyle=css("--edge");
-    ctx.beginPath(); ctx.moveTo(x,L.mainTop); ctx.lineTo(x,L.panelBot); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x,L.mainTop); ctx.lineTo(x,L.bottom); ctx.stroke();
     ctx.restore();
     for(const p of plot){
       const v=p.a[state.hover]; if(v==null) continue;
@@ -655,7 +793,7 @@ function updateQuote(indexed){
 function showTip(px,py){
   const i=state.hover;
   if(i<0){ tip.style.opacity=0; return; }
-  const PL=plan(), S=[css("--s1"),css("--s2"),css("--s3")];
+  const PL=plan(), S=PAL();
   let html=`<div class="d">${jDate(DATA.d[i])}</div>`;
 
   if(view().lines){
@@ -683,6 +821,12 @@ function showTip(px,py){
     html+=`<div class="r"><span class="dot" style="background:${S[idx%3]}"></span>`+
           `<span class="n">${m.n}</span><span class="v">${niceK(v,k)}</span></div>`;
   });
+  const R=window.__rsi;
+  if(R && R.a[i]!=null){
+    html+=`<div class="r"><span class="dot" style="background:${S[3]}"></span>`+
+          `<span class="n">RSI ${pnum(R.period)}</span>`+
+          `<span class="v">${R.a[i].toFixed(1)}</span></div>`;
+  }
   for(const m of (window.__mas||[])){
     if(m.a[i]==null) continue;
     html+=`<div class="r"><span class="dot" style="background:${m.color}"></span>`+
@@ -812,7 +956,7 @@ function setView(id){
   if(isSheet){
     viewsRow.querySelectorAll("button").forEach(b=>
       b.setAttribute("aria-pressed", b.dataset.v===id?"true":"false"));
-    syncChips();
+    syncChips(); syncMaRow(); syncRsiRow();
     renderSheet();
     return;
   }
@@ -821,14 +965,9 @@ function setView(id){
     b.setAttribute("aria-pressed", b.dataset.v===id?"true":"false"));
   applyRange(V.free?0:250);
   markRange(V.free?5:3);
-  syncChips(); draw();
+  syncChips(); syncMaRow(); syncRsiRow(); draw();
 }
 
-document.getElementById("ma").addEventListener("click",e=>{
-  state.showMA=!state.showMA;
-  e.currentTarget.setAttribute("aria-pressed", state.showMA?"true":"false");
-  draw();
-});
 document.getElementById("cmp").addEventListener("click",e=>{
   state.cmpMode=!state.cmpMode;
   if(state.cmpMode && state.compare.length<2){
@@ -840,10 +979,11 @@ document.getElementById("cmp").addEventListener("click",e=>{
 
 const legendRow=document.getElementById("legend");
 function syncChips(){
-  const V=view(), S=[css("--s1"),css("--s2"),css("--s3")];
+  const V=view(), S=PAL();
   if(V.sheet){
     seriesRow.hidden = legendRow.hidden = true;
-    document.getElementById("cmp").hidden = document.getElementById("ma").hidden = true;
+    document.getElementById("cmp").hidden = true;
+    maRow.hidden = true;
     document.querySelector(".quote").hidden = true;
     return;
   }
@@ -852,7 +992,6 @@ function syncChips(){
 
   seriesRow.hidden = !free;
   document.getElementById("cmp").hidden = !free;
-  document.getElementById("ma").hidden = !free || (state.cmpMode && state.compare.length>1);
 
   seriesRow.querySelectorAll(".chip").forEach(b=>{
     const k=b.dataset.k;
@@ -969,6 +1108,114 @@ csvBtn.addEventListener("click", async ()=>{
   } finally { csvBtn.disabled=false; }
 });
 
+
+
+/* ================= میانگین‌های متحرک دلخواه ================= */
+const maRow   = document.getElementById("maRow");
+const maInput = document.getElementById("maInput");
+const maKindRow = document.getElementById("maKind");
+const maSwatches = document.getElementById("maSwatches");
+
+const pnumList = a => a.map(pnum).join("، ");
+
+function readPeriods(txt){
+  /* «۵۰، ۲۰۰» یا «50 200» یا «50,200» — همه قبول */
+  const out=[];
+  for(const tok of norm(txt).split(/[^0-9]+/)){
+    if(!tok) continue;
+    const n=parseInt(tok,10);
+    if(n>=2 && n<=400 && !out.includes(n)) out.push(n);
+    if(out.length>=MAX_MA) break;
+  }
+  return out;
+}
+/* ارقام فارسی -> انگلیسی، تا تایپ فارسی هم کار کند */
+function norm(t){
+  const FA="۰۱۲۳۴۵۶۷۸۹", AR="٠١٢٣٤٥٦٧٨٩";
+  return [...String(t)].map(ch=>{
+    const i=FA.indexOf(ch); if(i>=0) return i;
+    const j=AR.indexOf(ch); if(j>=0) return j;
+    return ch;
+  }).join("");
+}
+
+function syncMaRow(){
+  const V=view();
+  if(V.sheet){ maRow.hidden=true; return; }
+  rsiBtn.hidden = false;
+  const indexed = state.cmpMode && state.compare.length>1 && V.free;
+  maRow.hidden = indexed;
+  if(indexed) return;
+
+  const ps = maPeriods();
+  if(document.activeElement !== maInput) maInput.value = pnumList(ps);
+  const def = (V.ema || (fa(state.key)?.ma) || [50,200]);
+  maInput.placeholder = pnumList(def);
+  maKindRow.querySelectorAll("button").forEach(b=>
+    b.setAttribute("aria-pressed", b.dataset.k===state.maKind ? "true":"false"));
+  const S=PAL();
+  /* رنگ به‌تنهایی نمی‌گوید کدام دوره کدام است — عدد کنارش می‌آید */
+  maSwatches.innerHTML = ps.slice(0,MAX_MA).map((p,j)=>
+    `<span class="it"><i style="background:${S[(j+1)%S.length]}"></i>${pnum(p)}</span>`).join("");
+}
+
+function applyPeriods(){
+  state.ma[state.view] = readPeriods(maInput.value);
+  syncMaRow(); syncChips(); draw();
+}
+maInput.addEventListener("change", applyPeriods);
+maInput.addEventListener("blur", applyPeriods);
+maInput.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); maInput.blur(); }});
+maKindRow.addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  state.maKind=b.dataset.k; syncMaRow(); syncChips(); draw();
+});
+
+/* ================= RSI ================= */
+const rsiBtn = document.getElementById("rsiBtn");
+const rsiInput = document.getElementById("rsiInput");
+const rsiDot = document.getElementById("rsiDot");
+const RSI_DEFAULT = 14;
+
+function syncRsiRow(){
+  const p = rsiPeriod();
+  const on = p != null;
+  rsiBtn.setAttribute("aria-pressed", on?"true":"false");
+  rsiDot.style.background = on ? PAL()[3] : "var(--edge)";
+  rsiInput.hidden = !on;
+  if(on && document.activeElement !== rsiInput) rsiInput.value = pnum(p);
+}
+rsiBtn.addEventListener("click", ()=>{
+  state.rsi[state.view] = rsiPeriod()==null ? RSI_DEFAULT : null;
+  syncRsiRow(); draw();
+});
+function applyRsi(){
+  const n = readPeriods(rsiInput.value)[0];
+  state.rsi[state.view] = n || RSI_DEFAULT;
+  syncRsiRow(); draw();
+}
+rsiInput.addEventListener("change", applyRsi);
+rsiInput.addEventListener("blur", applyRsi);
+rsiInput.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); rsiInput.blur(); }});
+
+/* ================= تمام‌صفحه ================= */
+const fsBtn = document.getElementById("fs");
+fsBtn.addEventListener("click", async ()=>{
+  try{
+    if(document.fullscreenElement) await document.exitFullscreen();
+    else await document.documentElement.requestFullscreen();
+  }catch(err){ /* بعضی مرورگرها اجازه نمی‌دهند — دکمه بی‌اثر می‌ماند */ }
+});
+document.addEventListener("fullscreenchange", ()=>{
+  const on = !!document.fullscreenElement;
+  fsBtn.textContent = on ? "خروج از تمام‌صفحه" : "تمام‌صفحه";
+  fsBtn.setAttribute("aria-pressed", on?"true":"false");
+  requestAnimationFrame(resize);
+});
+document.addEventListener("keydown", e=>{
+  if(e.key==="f" && !/input|textarea/i.test(e.target.tagName)) fsBtn.click();
+});
+
 /* ---------- راه‌اندازی ---------- */
 new ResizeObserver(resize).observe(stage);
 matchMedia("(prefers-color-scheme:dark)").addEventListener("change",()=>{syncChips();draw();});
@@ -977,6 +1224,8 @@ new MutationObserver(()=>{syncChips();draw();}).observe(
 document.fonts?.ready?.then(draw);
 state.compare=[state.key];
 syncChips();
+syncMaRow();
+syncRsiRow();
 resize();
 
 };
