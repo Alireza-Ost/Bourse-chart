@@ -256,7 +256,7 @@ button{font:inherit;color:inherit}
   </div>
 </div>
 
-<div id='boot' style="padding:24px;font-family:Vazirmatn,system-ui,sans-serif;color:#82857a">در حال بارگذاری داده…</div>
+<div id='boot' hidden style="padding:24px;font-family:Vazirmatn,system-ui,sans-serif;color:#82857a">در حال بارگذاری داده…</div>
 <script>
 window.__boot=function(DATA){
 /* ------------------------------------------------------------------ *
@@ -1229,9 +1229,49 @@ syncRsiRow();
 resize();
 
 };
+function load(){
+document.getElementById('boot').hidden=false;
 fetch('data.json?v='+Date.now())
   .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
   .then(function(d){ document.getElementById('boot').remove(); document.getElementById('appwrap').hidden=false; window.__boot(d); })
   .catch(function(e){ document.getElementById('boot').textContent='داده بارگذاری نشد ('+e.message+'). مطمئن شوید data.json کنار همین صفحه است.'; });
+}
+</script>
+<div id='gate' hidden style="position:fixed;inset:0;z-index:99;display:flex;align-items:center;justify-content:center;background:var(--bg,#faf9f5);font-family:Vazirmatn,system-ui,sans-serif"><form id='gateForm' style="display:flex;flex-direction:column;gap:14px;width:min(320px,86vw);text-align:center"><div style="font-size:17px;font-weight:700;color:var(--ink,#201f1c)">بورس تهران</div><div id='gateMsg' style="font-size:13px;color:var(--muted,#82857a)">کد ورود را وارد کنید</div><input id='gateIn' type='password' inputmode='numeric' autocomplete='off' style="padding:11px 14px;border:1px solid var(--line,#e5e3dc);border-radius:9px;background:var(--surface,#fff);color:var(--ink,#201f1c);font:inherit;font-size:16px;text-align:center;letter-spacing:3px"><button type='submit' style="padding:11px;border:0;border-radius:9px;background:var(--ink,#201f1c);color:var(--bg,#faf9f5);font:inherit;font-weight:600;cursor:pointer">ورود</button></form></div>
+<script>
+var GATE="e98a436b14e9624eaa8520e527aa8823c2a2ee867c641658b9bb2870e96e75f8";
+/* SHA-256 خالص، چون crypto.subtle روی file:// در دسترس نیست */
+function sha256(a){function b(x,n){return x>>>n|x<<32-n}var k=[],h=[],p=2,i,j,r;
+for(i=0;i<64;){for(j=2,r=1;j*j<=p;j++)if(p%j==0){r=0;break}
+if(r){if(i<8)h[i]=(Math.pow(p,.5)%1*4294967296)|0;k[i]=(Math.pow(p,1/3)%1*4294967296)|0;i++}p++}
+var m=[],u=unescape(encodeURIComponent(a)),L=u.length;
+for(i=0;i<L;i++)m[i>>2]|=(u.charCodeAt(i)&255)<<24-(i%4)*8;
+m[L>>2]|=128<<24-(L%4)*8;m[((L+8>>6)+1<<4)-1]=L*8;
+var w=[],s,t1,t2,A,B,C,D,E,F,G,H;
+for(i=0;i<m.length;i+=16){A=h[0];B=h[1];C=h[2];D=h[3];E=h[4];F=h[5];G=h[6];H=h[7];
+for(j=0;j<64;j++){if(j<16)w[j]=m[i+j]|0;else{var g0=b(w[j-15],7)^b(w[j-15],18)^w[j-15]>>>3,
+g1=b(w[j-2],17)^b(w[j-2],19)^w[j-2]>>>10;w[j]=w[j-16]+g0+w[j-7]+g1|0}
+t1=H+(b(E,6)^b(E,11)^b(E,25))+(E&F^~E&G)+k[j]+w[j]|0;
+t2=(b(A,2)^b(A,13)^b(A,22))+(A&B^A&C^B&C)|0;
+H=G;G=F;F=E;E=D+t1|0;D=C;C=B;B=A;A=t1+t2|0}
+h[0]=h[0]+A|0;h[1]=h[1]+B|0;h[2]=h[2]+C|0;h[3]=h[3]+D|0;
+h[4]=h[4]+E|0;h[5]=h[5]+F|0;h[6]=h[6]+G|0;h[7]=h[7]+H|0}
+for(s='',i=0;i<8;i++)s+=('00000000'+(h[i]>>>0).toString(16)).slice(-8);return s}
+var gate=document.getElementById('gate');
+function remember(v){try{localStorage.setItem('gate',v)}catch(e){}}
+function remembered(){try{return localStorage.getItem('gate')}catch(e){return null}}
+function unlock(){gate.remove();load()}
+if(!GATE||GATE.indexOf('_')===0){ load(); }
+else if(remembered()===GATE){ unlock(); }
+else{ gate.hidden=false; document.getElementById('gateIn').focus();
+  document.getElementById('gateForm').addEventListener('submit',function(e){
+    e.preventDefault();
+    var el=document.getElementById('gateIn');
+    if(sha256(el.value.trim())===GATE){ remember(GATE); unlock(); }
+    else{ document.getElementById('gateMsg').textContent='کد درست نیست.';
+          document.getElementById('gateMsg').style.color='#d4443a';
+          el.value=''; el.focus(); }
+  });
+}
 </script>
 </body></html>
