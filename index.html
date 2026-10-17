@@ -5,7 +5,7 @@
   --ground:#fbfbf9; --surface:#ffffff; --raised:#f4f4f0;
   --ink:#14150f; --ink-2:#4d4f46; --muted:#82857a;
   --line:#e4e4dd; --line-soft:#eeeee8; --edge:#cfd0c7;
-  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#a855c7; --s5:#b8860b;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#a855c7; --s5:#b8860b; --s6:#0e7490;
   --up:#0ca30c; --down:#d03b3b;
   --focus:#2a78d6;
   --shadow:0 1px 2px rgba(20,21,15,.06),0 8px 24px rgba(20,21,15,.07);
@@ -15,7 +15,7 @@
     --ground:#131410; --surface:#1b1c18; --raised:#232420;
     --ink:#f3f3ee; --ink-2:#c6c8bd; --muted:#8f9287;
     --line:#2b2d27; --line-soft:#232520; --edge:#3a3c35;
-    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#a855c7; --s5:#b8860b;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#a855c7; --s5:#b8860b; --s6:#22a7c0;
     --up:#2fb92f; --down:#e05c5c;
     --focus:#3987e5;
     --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.45);
@@ -25,7 +25,7 @@
   --ground:#131410; --surface:#1b1c18; --raised:#232420;
   --ink:#f3f3ee; --ink-2:#c6c8bd; --muted:#8f9287;
   --line:#2b2d27; --line-soft:#232520; --edge:#3a3c35;
-  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#a855c7; --s5:#b8860b;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#a855c7; --s5:#b8860b; --s6:#22a7c0;
   --up:#2fb92f; --down:#e05c5c;
   --focus:#3987e5;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.45);
@@ -124,6 +124,17 @@ button{font:inherit;color:inherit}
 /* انتخاب سری در نمای کلی هم کشویی است، به همان دلیل صنایع: نوزده چیپ
    کنار هم دو ردیف می‌شد. در حالت مقایسه چیپ‌ها برمی‌گردند، چون آن‌جا
    باید دو-سه سری با هم انتخاب شوند و کشویی این کار را نمی‌کند. */
+/* نوار اندیکاتورها — کشویی‌هایش مثل کشویی سری، و ورودی ضریب انحراف
+   باریک است چون فقط یک عدد یک‌رقمی می‌گیرد. */
+#ovRow select{
+  font:inherit; font-size:12.5px; color:var(--ink); background:var(--surface);
+  border:1px solid var(--line); border-radius:7px; padding:4px 9px;
+  width:auto; max-width:min(50vw,220px);
+}
+#ovRow #vwapK{width:62px; text-align:center}
+#ovRow #lrcWin2{max-width:min(40vw,190px)}
+#ovRow .gap{width:10px; flex:none}
+#ovRow .label{white-space:nowrap}
 #pickRow select{
   font:inherit; font-size:12.5px; color:var(--ink); background:var(--surface);
   border:1px solid var(--line); border-radius:7px; padding:4px 9px;
@@ -253,6 +264,23 @@ button{font:inherit;color:inherit}
       <input class="ma-input" id="rsiInput" type="text" inputmode="numeric"
              autocomplete="off" placeholder="۱۴" hidden>
     </div>
+    <div class="row" id="ovRow">
+      <span class="label">اندیکاتور</span>
+      <button class="chip" id="vwapBtn" aria-pressed="false">
+        <span class="dot" id="vwapDot"></span>VWAP
+      </button>
+      <select id="vwapAnchor" hidden></select>
+      <input class="ma-input" id="vwapK" type="text" inputmode="numeric"
+             autocomplete="off" placeholder="۲σ" hidden>
+      <span class="gap"></span>
+      <button class="chip" id="lrcBtn" aria-pressed="false">
+        <span class="dot" id="lrcDot"></span>LRC
+      </button>
+      <select id="lrcWin" hidden></select>
+      <select id="lrcWin2" hidden></select>
+      <span class="sep"></span>
+      <span class="label" id="ovNote"></span>
+    </div>
   </div>
 
   <div class="stage" id="stage">
@@ -375,6 +403,8 @@ const state = {
   maKind:"ema",
   rsi:{},              // نما -> دورهٔ RSI، یا null یعنی خاموش
   ma:{},               // نما -> فهرست دوره‌ها؛ با پیش‌فرض همان نما پر می‌شود
+  vwap:{},             // نما -> {anchor,k} یا null
+  lrc:{},              // نما -> طول پنجره، یا null
   i0:Math.max(0,N-250), i1:N-1,
   hover:-1,
 };
@@ -500,6 +530,164 @@ function rsiOf(arr, period){
   return out;
 }
 
+/* ================= VWAP لنگرانداخته و منحنی رگرسیون =================
+
+   هر دو روی «قیمت پایانی» کار می‌کنند — یعنی همان سری‌ای که رسم شده، چون
+   دادهٔ ما روزانه است و هر روز یک عدد دارد، نه OHLC.
+
+   VWAP: میانگین وزنیِ قیمت به حجم، ولی **انباشته از آغاز دوره** نه متحرک.
+   در آغاز هر هفته/ماه/فصل/سال از صفر شروع می‌شود — همان «Anchored VWAP»
+   که در تریدینگ‌ویو می‌شناسید. وزنش ارزش معاملات همان روز است.
+
+   نوارها انحراف معیارِ **وزنیِ** قیمت حول خود VWAP‌اند، نه انحراف معیار
+   ساده:  σ² = Σw(p−vwap)² / Σw = Σwp²/Σw − vwap².
+   پس نوار پهن یعنی قیمت در آن دوره پراکنده بوده، نه اینکه صرفاً نوسان
+   روزانه زیاد بوده.
+
+   LRC: خط کمترین مربعات روی n نقطهٔ آخر، و مقدارش را *در همان نقطه*
+   می‌گیریم. پس برخلاف میانگین متحرک، عقب‌ماندگی فاز ندارد و شیبش جهت روند
+   را می‌گوید. نقطه‌های بی‌داده رد می‌شوند و اگر کمتر از ۶۰٪ پنجره داده
+   باشد چیزی نمی‌دهد — همان قاعدهٔ میانگین‌ها.
+   ------------------------------------------------------------------ */
+const VWAP_ANCHORS = [
+  {id:"w", n:"هفتگی"}, {id:"m", n:"ماهانه"},
+  {id:"q", n:"فصلی"},  {id:"y", n:"سالانه"},
+];
+const LRC_WINS = [
+  {id:5,   n:"هفتگی — ۵ روز"},
+  {id:21,  n:"ماهانه — ۲۱ روز"},
+  {id:63,  n:"فصلی — ۶۳ روز"},
+  {id:250, n:"سالانه — ۲۵۰ روز"},
+];
+const VWAP_K_DEFAULT = 2;
+/* بیشتر از این تعداد تقاطع در یک نما، نشانه‌ها فقط شلوغی‌اند */
+const MAX_CROSS_MARKS = 25;
+
+/* نتیجه‌ها سنگین‌اند (۸٬۰۴۷ نقطه × پنجرهٔ ۲۵۰) و draw با هر جابه‌جایی
+   صدا زده می‌شود، پس یک بار حساب و نگه داشته می‌شوند. کلید شامل قاب است
+   چون سری هفتگی و روزانه هم‌نام‌اند ولی یکی نیستند. */
+const _calcCache = new Map();
+function cached(key, make){
+  if(_calcCache.has(key)) return _calcCache.get(key);
+  const v = make();
+  if(_calcCache.size > 60) _calcCache.clear();
+  _calcCache.set(key, v);
+  return v;
+}
+
+/* کدام سری وزنِ VWAP این سری است؟ null یعنی VWAP برایش بی‌معنی است. */
+const VWAP_WEIGHT = {
+  index_total:"value_retail", index_ew:"value_retail",
+  mv:"value_retail", mv_tse:"value_retail", mv_ifb:"value_retail",
+  mv_usd:"value_retail", mv_gold:"value_retail", pe:"value_retail",
+  ratio:"value_retail",
+};
+function weightKey(k){
+  const m = IND_KEY_RE.exec(String(k||""));
+  if(m) return (m[2]==="gindex" || m[2]==="pe") ? `ind_${m[1]}_value` : null;
+  return VWAP_WEIGHT[k] || null;
+}
+
+/* شناسهٔ دوره برای ردیف i. هفته از تاریخ میلادی حساب می‌شود (شنبه مرز
+   است) چون شمارهٔ هفتهٔ شمسی دردسر دارد و روزِ هفته همان است. */
+function periodKey(i, mode){
+  const d = FD(i);
+  if(mode==="y") return d.slice(0,4);
+  if(mode==="q") return d.slice(0,4) + "Q" + Math.ceil(+d.slice(4,6)/3);
+  if(mode==="m") return d.slice(0,6);
+  const g = String(frame().t[i]);
+  const dt = new Date(+g.slice(0,4), +g.slice(4,6)-1, +g.slice(6,8));
+  dt.setDate(dt.getDate() - ((dt.getDay()+1) % 7));   // عقب تا شنبه
+  return "W" + dt.getFullYear() + (dt.getMonth()+1) + "_" + dt.getDate();
+}
+
+function vwapCalc(price, wgt, mode, k){
+  const n = price.length;
+  const mid=new Array(n).fill(null), up=new Array(n).fill(null),
+        dn=new Array(n).fill(null);
+  let key=null, sw=0, swp=0, swp2=0;
+  for(let i=0;i<n;i++){
+    const pk = periodKey(i, mode);
+    if(pk !== key){ key=pk; sw=swp=swp2=0; }
+    const p=price[i], w=wgt ? wgt[i] : null;
+    if(p==null || w==null || !(w>0)) continue;
+    sw+=w; swp+=w*p; swp2+=w*p*p;
+    const v = swp/sw;
+    const sd = Math.sqrt(Math.max(0, swp2/sw - v*v));
+    mid[i]=v; up[i]=v+k*sd; dn[i]=v-k*sd;
+  }
+  return {mid, up, dn};
+}
+
+function lrcCalc(a, win){
+  const n=a.length, out=new Array(n).fill(null);
+  const need = Math.max(3, Math.ceil(win*0.6));
+  for(let i=0;i<n;i++){
+    let c=0, sx=0, sy=0, sxx=0, sxy=0;
+    for(let j=Math.max(0, i-win+1); j<=i; j++){
+      const v=a[j]; if(v==null) continue;
+      const x=j-i;                       // آخرین نقطه x=0 می‌شود
+      c++; sx+=x; sy+=v; sxx+=x*x; sxy+=x*v;
+    }
+    if(c < need) continue;
+    const den = c*sxx - sx*sx;
+    if(!den) continue;
+    const slope = (c*sxy - sx*sy)/den;
+    out[i] = (sy - slope*sx)/c;          // مقدار خط در x=0
+  }
+  return out;
+}
+
+/* تنظیمات اندیکاتورهای نمای جاری.
+   lrcOn یک جفت پنجره برمی‌گرداند: {a, b} — دومی می‌تواند null باشد.
+   عدد تنها هم پذیرفته می‌شود تا حالت‌های ذخیره‌شدهٔ قدیمی نشکنند. */
+function vwapOn(){ const v=state.vwap[state.view]; return v || null; }
+function lrcOn(){
+  const v = state.lrc[state.view];
+  if(!v) return null;
+  return typeof v === "number" ? {a:v, b:null} : v;
+}
+
+/* نقاط تقاطع دو منحنی — جایی که علامت اختلافشان عوض می‌شود.
+   نقطهٔ گزارش‌شده همان ردیفِ بعد از تغییر علامت است، و `up` می‌گوید
+   منحنی کوتاه از پایین به بالا رد شده یا برعکس. */
+function crossings(a, b, i0, i1){
+  const out = [];
+  let prev = null;
+  for(let i=Math.max(0,i0); i<=i1; i++){
+    if(a[i]==null || b[i]==null) continue;
+    const d = a[i] - b[i];
+    if(d === 0) continue;
+    const s = d > 0;
+    if(prev !== null && s !== prev) out.push({i, up:s});
+    prev = s;
+  }
+  return out;
+}
+
+/* لایهٔ آمادهٔ رسم: {vwap?, lrc?} — یا تهی اگر خاموش/بی‌معنی باشند */
+function overlays(PL){
+  const out = {};
+  if(PL.indexed || !PL.keys.length) return out;
+  const key = PL.keys[0], fid = frame().id || "day";
+  const V = vwapOn();
+  if(V){
+    const wk = weightKey(key);
+    const w = wk ? FS(wk) : null;
+    if(w) out.vwap = Object.assign(
+      cached(`vwap|${fid}|${key}|${wk}|${V.anchor}|${V.k}`,
+             () => vwapCalc(FS(key)||[], w, V.anchor, V.k)),
+      {anchor:V.anchor, k:V.k, wk});
+  }
+  const W = lrcOn();
+  if(W){
+    const mk = w => cached(`lrc|${fid}|${key}|${w}`, () => lrcCalc(FS(key)||[], w));
+    out.lrc = { win:W.a, a:mk(W.a) };
+    if(W.b && W.b !== W.a) out.lrc2 = { win:W.b, a:mk(W.b) };
+  }
+  return out;
+}
+
 /* دورهٔ RSI نمای جاری — null یعنی خاموش */
 function rsiPeriod(){
   const id=state.view;
@@ -586,12 +774,25 @@ const NO_VOLUME = new Set(["value_retail","value_lev","value_goldfund",
                            "mv_usd","usd_rate","gold18","mv_gold","m2","pe"]);
 
 /* دوره‌های میانگین برای نمای جاری. خالی یعنی هیچ میانگینی. */
-function maPeriods(){
-  /* هر بازهٔ نسبت نقدینگی حافظهٔ خودش را دارد: اگر روی ماهانه دوره را
-     عوض کردید، برگشتن به روزانه دوره‌های روزانه را برمی‌گرداند. */
+/* کلید حافظهٔ دوره‌های میانگین.
+   هر بازهٔ نسبت نقدینگی حافظهٔ خودش را دارد: اگر روی ماهانه دوره را عوض
+   کردید، برگشتن به روزانه دوره‌های روزانه را برمی‌گرداند.
+
+   ⚠ این تابع جدا شد چون یک بار خواندن و نوشتن از دو کلید مختلف انجام
+     می‌شد — خواندن از «ratio:d» و نوشتن روی «ratio» — و نتیجه‌اش این بود
+     که در تب نسبت نقدینگی هر چه در کادر میانگین می‌نوشتید بی‌اثر بود و
+     عددها روی پیش‌فرض می‌ماندند. حالا هر دو از همین‌جا می‌آیند. */
+function maKey(){
   const V=view();
-  const id = V.resample ? `${state.view}:${state.ratioStep}` : state.view;
-  if(!(id in state.ma)) state.ma[id] = ((V.resample ? ratioStep().ema : V.ema) || []).slice();
+  return V.resample ? `${state.view}:${state.ratioStep}` : state.view;
+}
+function maDefaults(){
+  const V=view();
+  return ((V.resample ? ratioStep().ema : V.ema) || []).slice();
+}
+function maPeriods(){
+  const id = maKey();
+  if(!(id in state.ma)) state.ma[id] = maDefaults();
   return state.ma[id];
 }
 
@@ -700,8 +901,16 @@ function draw(){
     if(l===h){l-=1;h+=1;}
     const pd=(h-l)*0.08; return [l-pd,h+pd];
   };
-  let [lo,hi]=span(dual ? [plot[0].a, ...mas.map(m=>m.a)]
-                        : [...plot.map(p=>p.a), ...mas.map(m=>m.a)]);
+  /* اندیکاتورهای روی نمودار اصلی — قبل از حساب بازهٔ عمودی، وگرنه نوار
+     پایینیِ VWAP از کف کادر می‌زد بیرون. */
+  const OV = overlays(PL);
+  const ovArrs = [];
+  if(OV.vwap) ovArrs.push(OV.vwap.mid, OV.vwap.up, OV.vwap.dn);
+  if(OV.lrc)  ovArrs.push(OV.lrc.a);
+  if(OV.lrc2) ovArrs.push(OV.lrc2.a);
+
+  let [lo,hi]=span(dual ? [plot[0].a, ...mas.map(m=>m.a), ...ovArrs]
+                        : [...plot.map(p=>p.a), ...mas.map(m=>m.a), ...ovArrs]);
   /* ستون از کفِ صفر بلند می‌شود، پس محور هم باید از صفر شروع کند —
      وگرنه بلندی ستون‌ها نسبت به هم دروغ می‌گوید. */
   if(PL.bars) lo = 0;
@@ -873,6 +1082,54 @@ function draw(){
     strokeSeries(m.a, L, yAt, PL.hole);
   }
 
+  /* ---- VWAP و منحنی رگرسیون ----
+     نوارها اول می‌آیند و کم‌رنگ، تا خط قیمت رویشان بنشیند نه زیرشان.
+     VWAP در آغاز هر دوره صفر می‌شود، پس خطش باید همان‌جا بشکند — با
+     hole=1 هر گسست یک قلم‌برداشتن است. */
+  if(OV.vwap){
+    const cv = css("--s5");
+    ctx.save();
+    ctx.globalAlpha=.42; ctx.setLineDash([4,3]); ctx.lineWidth=1.2; ctx.strokeStyle=cv;
+    strokeSeries(OV.vwap.up, L, yAt, 1);
+    strokeSeries(OV.vwap.dn, L, yAt, 1);
+    ctx.restore();
+    ctx.strokeStyle=cv; ctx.lineWidth=1.8;
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    strokeSeries(OV.vwap.mid, L, yAt, 1);
+  }
+  if(OV.lrc){
+    ctx.strokeStyle=css("--s4"); ctx.lineWidth=1.8;
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    strokeSeries(OV.lrc.a, L, yAt, PL.hole);
+  }
+  if(OV.lrc2){
+    ctx.strokeStyle=css("--s6"); ctx.lineWidth=1.8;
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    strokeSeries(OV.lrc2.a, L, yAt, PL.hole);
+    /* تقاطع‌ها: حلقهٔ توخالی روی نقطهٔ تغییر علامت. توخالی است تا خط
+       زیرش دیده شود و معلوم بماند کدام از کدام رد شده. رنگ جهت را
+       می‌گوید: سبز یعنی پنجرهٔ کوتاه‌تر از پایین به بالا رفته. */
+    const short = OV.lrc.win <= OV.lrc2.win ? OV.lrc.a : OV.lrc2.a;
+    const long  = OV.lrc.win <= OV.lrc2.win ? OV.lrc2.a : OV.lrc.a;
+    const xs = crossings(short, long, state.i0, state.i1);
+    /* روی کل تاریخچه دویست‌وپنجاه تقاطع در دید است و حلقه‌ها یک نوار
+       توپُر می‌سازند که هیچ نمی‌گوید. از یک حدی به بالا کشیده نمی‌شوند و
+       لجند می‌گوید چندتاست و برای دیدنشان باید بزرگ‌نمایی کرد. خودِ
+       فهرست سر جایش می‌ماند، پس راهنمای شناور هنوز تقاطع را می‌گوید. */
+    window.__crossHidden = xs.length > MAX_CROSS_MARKS ? xs.length : 0;
+    if(!window.__crossHidden){
+      ctx.save(); ctx.lineWidth=2;
+      for(const c of xs){
+        const x=xAt(c.i,L), y=yAt((short[c.i]+long[c.i])/2);
+        ctx.strokeStyle = c.up ? up : down;
+        ctx.fillStyle = surf;
+        ctx.beginPath(); ctx.arc(x,y,4.5,0,7); ctx.fill(); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    window.__cross = xs;
+  } else { window.__cross = null; window.__crossHidden = 0; }
+
   /* ---- خطوط اصلی ---- */
   plot.forEach((p,pi)=>{
     if(PL.bars && pi===0){
@@ -989,6 +1246,14 @@ function draw(){
   }
 
   window.__mas = mas;      // برای راهنمای شناور
+  window.__ov = OV;
+  /* شمارش تقاطع‌ها تازه همین‌جا معلوم شد، ولی لجند قبل از رسم ساخته
+     می‌شود. اگر وضعیت عوض شده باشد یک بار دیگر ساخته می‌شود — syncChips
+     خودش draw صدا نمی‌زند، پس حلقه نمی‌شود. */
+  if(window.__crossShown !== window.__crossHidden){
+    window.__crossShown = window.__crossHidden;
+    syncChips();
+  }
   updateQuote(indexed);
 }
 
@@ -1064,6 +1329,42 @@ function showTip(px,py){
     html+=`<div class="r"><span class="dot" style="background:${m.color}"></span>`+
           `<span class="n">${(PL.maKind==="ema"?"EMA ":"MA ")+pnum(m.p)}</span>`+
           `<span class="v">${niceK(m.a[i],PL.keys[0])}</span></div>`;
+  }
+  const OV = window.__ov || {};
+  if(OV.vwap && OV.vwap.mid[i]!=null){
+    const nm = (VWAP_ANCHORS.find(x=>x.id===OV.vwap.anchor)||{}).n || "";
+    const v = OV.vwap.mid[i], k = PL.keys[0];
+    html+=`<div class="r"><span class="dot" style="background:${css("--s5")}"></span>`+
+          `<span class="n">VWAP ${nm}</span><span class="v">${niceK(v,k)}</span></div>`;
+    if(OV.vwap.up[i]!=null)
+      html+=`<div class="r"><span class="dot" style="background:${css("--s5")};opacity:.35"></span>`+
+            `<span class="n">نوار ±${pnum(OV.vwap.k)}σ</span>`+
+            `<span class="v">${niceK(OV.vwap.dn[i],k)} … ${niceK(OV.vwap.up[i],k)}</span></div>`;
+    /* فاصلهٔ قیمت از VWAP بر حسب انحراف معیار — همان چیزی که آدم با چشم
+       از پهنای نوار حدس می‌زند، این‌جا عددش هست. */
+    const p = (FS(k)||[])[i], sd = OV.vwap.up[i]!=null ? (OV.vwap.up[i]-v)/OV.vwap.k : 0;
+    if(p!=null && sd>0){
+      const z = (p - v)/sd;
+      html+=`<div class="r"><span class="dot" style="background:var(--edge)"></span>`+
+            `<span class="n">فاصله از VWAP</span>`+
+            `<span class="v">${z>=0?"+":"−"}${Math.abs(z).toFixed(2)}σ</span></div>`;
+    }
+  }
+  if(OV.lrc && OV.lrc.a[i]!=null){
+    html+=`<div class="r"><span class="dot" style="background:${css("--s4")}"></span>`+
+          `<span class="n">LRC ${pnum(OV.lrc.win)}</span>`+
+          `<span class="v">${niceK(OV.lrc.a[i],PL.keys[0])}</span></div>`;
+  }
+  if(OV.lrc2 && OV.lrc2.a[i]!=null){
+    html+=`<div class="r"><span class="dot" style="background:${css("--s6")}"></span>`+
+          `<span class="n">LRC ${pnum(OV.lrc2.win)}</span>`+
+          `<span class="v">${niceK(OV.lrc2.a[i],PL.keys[0])}</span></div>`;
+    /* اگر همین روز تقاطع بوده، بگو — وگرنه حلقهٔ روی نمودار بی‌توضیح است */
+    const hit = (window.__cross||[]).find(c=>c.i===i);
+    if(hit)
+      html+=`<div class="r"><span class="dot" style="background:${hit.up?css("--up"):css("--down")}"></span>`+
+            `<span class="n">تقاطع</span>`+
+            `<span class="v">${hit.up ? "کوتاه از پایین به بالا" : "کوتاه از بالا به پایین"}</span></div>`;
   }
   /* ورود/خروج پول: در نمای بازار «ورود پول حقیقی» بازار، و در نمای
      ارزش معاملات صنایع همان سری برای همان صنعت. */
@@ -1202,7 +1503,7 @@ function setView(id){
   viewsRow.querySelectorAll("button").forEach(b=>
     b.setAttribute("aria-pressed", b.dataset.v===id?"true":"false"));
   if(isSheet){
-    syncChips(); syncMaRow(); syncRsiRow();
+    syncChips(); syncMaRow(); syncRsiRow(); syncOvRow();
     if(V.ind){ ensureInd(); return; }   // ensureInd خودش جدول را می‌سازد
     renderSheet();
     return;
@@ -1216,7 +1517,7 @@ function setView(id){
   }
   applyRange(V.free?0:250);
   markRange(V.free?5:3);
-  syncChips(); syncMaRow(); syncRsiRow(); draw();
+  syncChips(); syncMaRow(); syncRsiRow(); syncOvRow(); draw();
 }
 
 document.getElementById("cmp").addEventListener("click",e=>{
@@ -1264,8 +1565,12 @@ function syncChips(){
     b.querySelector(".dot").style.background = on ? S[Math.max(0,idx)%3] : "var(--edge)";
   });
 
-  legendRow.hidden = free;
-  if(free) return;
+  /* در نمای کلی لجند معمولاً حذف است، چون چیپ‌ها خودشان می‌گویند چه رسم
+     شده. ولی وقتی اندیکاتوری روشن است دو خط رنگی اضافه روی نمودار هست
+     که چیپ‌ها توضیحشان نمی‌دهند — آن‌وقت لجند برمی‌گردد. */
+  const ovAny = !!lrcOn() || (!!vwapOn() && !!weightKey(plan().keys[0]));
+  legendRow.hidden = free && !ovAny;
+  if(free && !ovAny) return;
   /* لجند کامل نوشته می‌شود: نام بلندِ سری (اگر داشته باشد) به‌علاوهٔ
      واحدش، و میانگین‌ها با عبارت فارسی به‌جای «EMA 28». نام چیپ‌ها کوتاه
      است چون باید در یک خط جا شود؛ لجند این محدودیت را ندارد. */
@@ -1300,6 +1605,28 @@ function syncChips(){
   } else if(V.panel==="flow"){
     items.push([css("--up"),"ورود پول (مثبت)","box"]);
     items.push([css("--down"),"خروج پول (منفی)","box"]);
+  }
+  /* اندیکاتورها، اگر روشن باشند */
+  const vw = vwapOn(), wk = vw && weightKey(P.keys[0]);
+  if(vw && wk){
+    const an = (VWAP_ANCHORS.find(x=>x.id===vw.anchor)||{}).n || "";
+    items.push([css("--s5"),
+      `VWAP ${an} — میانگین وزنیِ قیمت به ${(fa(wk)||{}).n || "ارزش معاملات"}`, "line"]);
+    items.push([css("--s5"), `نوار ±${pnum(vw.k)} انحراف معیار وزنی`, "line"]);
+  }
+  const lw = lrcOn();
+  if(lw){
+    items.push([css("--s4"), `منحنی رگرسیون خطی — پنجرهٔ ${pnum(lw.a)} روزه`, "line"]);
+    if(lw.b && lw.b !== lw.a){
+      items.push([css("--s6"), `منحنی رگرسیون خطی — پنجرهٔ ${pnum(lw.b)} روزه`, "line"]);
+      if(window.__crossHidden)
+        items.push([css("--edge"),
+          `${pnum(window.__crossHidden)} تقاطع در این بازه — برای دیدن نشانه‌ها بزرگ‌نمایی کنید`, "box"]);
+      else {
+        items.push([css("--up"), "تقاطع رو به بالا", "box"]);
+        items.push([css("--down"), "تقاطع رو به پایین", "box"]);
+      }
+    }
   }
   legendRow.innerHTML = items.map(([c,n,kind])=>
     `<span class="it"><span class="sw${kind==="box"?" box":""}" style="background:${c}"></span>${n}</span>`
@@ -1463,8 +1790,8 @@ function syncMaRow(){
 
   const ps = maPeriods();
   if(document.activeElement !== maInput) maInput.value = pnumList(ps);
-  const def = (V.ema || (fa(state.key)?.ma) || [50,200]);
-  maInput.placeholder = pnumList(def);
+  const def = maDefaults();
+  maInput.placeholder = pnumList(def.length ? def : (fa(state.key)?.ma) || [50,200]);
   maKindRow.querySelectorAll("button").forEach(b=>
     b.setAttribute("aria-pressed", b.dataset.k===state.maKind ? "true":"false"));
   const S=PAL();
@@ -1474,7 +1801,10 @@ function syncMaRow(){
 }
 
 function applyPeriods(){
-  state.ma[state.view] = readPeriods(maInput.value);
+  /* کادر خالی یعنی «برگرد به پیش‌فرض همین نما»، نه «هیچ میانگینی» —
+     وگرنه پاک‌کردن کادر نمودار را بی‌میانگین می‌کرد و راه برگشتی نبود. */
+  const txt = norm(maInput.value).trim();
+  state.ma[maKey()] = txt ? readPeriods(txt) : maDefaults();
   syncMaRow(); syncChips(); draw();
 }
 maInput.addEventListener("change", applyPeriods);
@@ -1511,6 +1841,114 @@ function applyRsi(){
 rsiInput.addEventListener("change", applyRsi);
 rsiInput.addEventListener("blur", applyRsi);
 rsiInput.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); rsiInput.blur(); }});
+
+/* ================= نوار اندیکاتورها ================= */
+const ovRow      = document.getElementById("ovRow");
+const vwapBtn    = document.getElementById("vwapBtn");
+const vwapDot    = document.getElementById("vwapDot");
+const vwapAnchor = document.getElementById("vwapAnchor");
+const vwapK      = document.getElementById("vwapK");
+const lrcBtn     = document.getElementById("lrcBtn");
+const lrcDot     = document.getElementById("lrcDot");
+const lrcWin     = document.getElementById("lrcWin");
+const lrcWin2    = document.getElementById("lrcWin2");
+const ovNote     = document.getElementById("ovNote");
+
+VWAP_ANCHORS.forEach(a=>{
+  const o=document.createElement("option"); o.value=a.id; o.textContent=a.n;
+  vwapAnchor.appendChild(o);
+});
+LRC_WINS.forEach(w=>{
+  const o=document.createElement("option"); o.value=w.id; o.textContent=w.n;
+  lrcWin.appendChild(o);
+});
+/* منحنی دوم اختیاری است: گزینهٔ خالی یعنی خاموش، و تا وقتی خاموش است
+   تقاطعی هم در کار نیست. */
+{
+  const o=document.createElement("option"); o.value=""; o.textContent="— منحنی دوم —";
+  lrcWin2.appendChild(o);
+  LRC_WINS.forEach(w=>{
+    const x=document.createElement("option"); x.value=w.id; x.textContent=w.n;
+    lrcWin2.appendChild(x);
+  });
+}
+
+function syncOvRow(){
+  const V=view();
+  if(V.sheet){ ovRow.hidden=true; return; }
+  const indexed = state.cmpMode && state.compare.length>1 && V.free;
+  ovRow.hidden = indexed;
+  if(indexed) return;
+
+  const key = plan().keys[0];
+  const wk  = weightKey(key);
+  /* VWAP بدون حجم معنی ندارد. به‌جای اینکه دکمه کار کند و خطی نیاید،
+     خاموش و خاکستری می‌ماند و کنارش می‌نویسد چرا. */
+  vwapBtn.disabled = !wk;
+  vwapBtn.style.opacity = wk ? "" : ".45";
+  vwapBtn.title = wk ? `وزن: ${(fa(wk)||{}).n||wk}` : "برای این سری ارزش معاملاتی نداریم";
+
+  const v = vwapOn();
+  const on = !!v && !!wk;
+  vwapBtn.setAttribute("aria-pressed", on?"true":"false");
+  vwapDot.style.background = on ? css("--s5") : "var(--edge)";
+  vwapAnchor.hidden = vwapK.hidden = !on;
+  if(on){
+    vwapAnchor.value = v.anchor;
+    if(document.activeElement !== vwapK) vwapK.value = pnum(v.k);
+  }
+
+  const w = lrcOn();
+  lrcBtn.setAttribute("aria-pressed", w?"true":"false");
+  lrcDot.style.background = w ? css("--s4") : "var(--edge)";
+  lrcWin.hidden = lrcWin2.hidden = !w;
+  if(w){
+    lrcWin.value = String(w.a);
+    lrcWin2.value = w.b ? String(w.b) : "";
+  }
+
+  ovNote.textContent = on ? `وزن: ${(fa(wk)||{}).n||""}` : "";
+}
+
+vwapBtn.addEventListener("click", ()=>{
+  if(vwapBtn.disabled) return;
+  state.vwap[state.view] = vwapOn() ? null
+    : {anchor:"m", k:VWAP_K_DEFAULT};
+  syncOvRow(); syncChips(); draw();
+});
+vwapAnchor.addEventListener("change", ()=>{
+  const v = vwapOn(); if(!v) return;
+  state.vwap[state.view] = {anchor:vwapAnchor.value, k:v.k};
+  syncOvRow(); syncChips(); draw();
+});
+function applyVwapK(){
+  const v = vwapOn(); if(!v) return;
+  /* ضریب اعشاری هم قبول است («۱٫۵»)، ولی readPeriods فقط صحیح می‌دهد */
+  const t = norm(vwapK.value).replace(/[٫،]/g, ".").replace(/[^0-9.]/g,"");
+  let k = parseFloat(t);
+  if(!isFinite(k) || k<=0 || k>6) k = VWAP_K_DEFAULT;
+  state.vwap[state.view] = {anchor:v.anchor, k:+k.toFixed(2)};
+  syncOvRow(); syncChips(); draw();
+}
+vwapK.addEventListener("change", applyVwapK);
+vwapK.addEventListener("blur", applyVwapK);
+vwapK.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); vwapK.blur(); }});
+
+lrcBtn.addEventListener("click", ()=>{
+  /* بار اول با دو پنجره روشن می‌شود (۲۱ و ۶۳) تا تقاطع‌ها از همان اول
+     دیده شوند؛ با یک منحنی تنها چیزی برای تقاطع نیست. */
+  state.lrc[state.view] = lrcOn() ? null : {a:21, b:63};
+  syncOvRow(); syncChips(); draw();
+});
+function applyLrc(){
+  const w = lrcOn(); if(!w) return;
+  const a = +lrcWin.value || 63;
+  const b = lrcWin2.value ? +lrcWin2.value : null;
+  state.lrc[state.view] = {a, b: (b && b !== a) ? b : null};
+  syncOvRow(); syncChips(); draw();
+}
+lrcWin.addEventListener("change", applyLrc);
+lrcWin2.addEventListener("change", applyLrc);
 
 /* ================= تمام‌صفحه ================= */
 const fsBtn = document.getElementById("fs");
@@ -1559,7 +1997,7 @@ const ORDINALS = ["اول","دوم","سوم","چهارم","پنجم","ششم"];
    مثل تعطیلی بلندِ اسفند ۱۴۰۴ — اصلاً ستون نمی‌گیرد.
    ------------------------------------------------------------ */
 const FRAMES = {};
-FRAMES.day = {d:DATA.d, t:DATA.t, n:N, s:DATA, per:1, unit:"روز معاملاتی"};
+FRAMES.day = {id:"day", d:DATA.d, t:DATA.t, n:N, s:DATA, per:1, unit:"روز معاملاتی"};
 
 (function buildRatioFrames(){
   const src = DATA.ratio;
@@ -1619,11 +2057,11 @@ FRAMES.day = {d:DATA.d, t:DATA.t, n:N, s:DATA, per:1, unit:"روز معاملا�
   const labM = keep.map(i => ({y:labW[i].y, mo:labW[i].mo, w:0}));
 
   FRAMES.w = {
-    d:wk.d, t:wk.t, n:wk.d.length, per:5, unit:"هفته",
+    id:"w", d:wk.d, t:wk.t, n:wk.d.length, per:5, unit:"هفته",
     s:{ratio_w: wk.v}, labels:labW,
   };
   FRAMES.m = {
-    d:keep.map(i=>wk.d[i]), t:keep.map(i=>wk.t[i]), n:keep.length, per:21, unit:"ماه",
+    id:"m", d:keep.map(i=>wk.d[i]), t:keep.map(i=>wk.t[i]), n:keep.length, per:21, unit:"ماه",
     s:{ratio_m: keep.map(i=>wk.v[i])}, labels:labM,
   };
 
@@ -1665,7 +2103,7 @@ SERIES.filter(s=>!s.hide && DATA[s.k]).forEach(s=>{
 });
 serPick.addEventListener("change", ()=>{
   state.key = serPick.value; state.compare=[state.key];
-  syncChips(); syncMaRow(); syncRsiRow(); draw();
+  syncChips(); syncMaRow(); syncRsiRow(); syncOvRow(); draw();
 });
 
 /* ---- کلیدهای روزانه/هفتگی/ماهانه در تب نسبت نقدینگی ---- */
@@ -1681,7 +2119,7 @@ RATIO_STEPS.forEach(s=>{
        می‌ماندند و تاریخِ ردیفِ ناموجود خوانده می‌شد. */
     const on = rangeRow.querySelector('button[aria-pressed="true"]');
     applyRange(on ? +on.dataset.d : 0);
-    syncChips(); syncMaRow(); syncRsiRow(); draw();
+    syncChips(); syncMaRow(); syncRsiRow(); syncOvRow(); draw();
   });
   stepRow.appendChild(b);
 });
@@ -1840,7 +2278,7 @@ function applyIndChart(){
      چند ماه داده دارد، applyRange خودش تا آخرین روزِ دارای داده عقب
      می‌آید. */
   applyRange(250); markRange(3);
-  syncChips(); syncMaRow(); syncRsiRow(); draw();
+  syncChips(); syncMaRow(); syncRsiRow(); syncOvRow(); draw();
 }
 
 function ensureIndChart(){
@@ -1867,6 +2305,7 @@ state.compare=[state.key];
 syncChips();
 syncMaRow();
 syncRsiRow();
+syncOvRow();
 resize();
 
 };
