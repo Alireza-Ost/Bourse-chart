@@ -170,6 +170,47 @@ button{font:inherit;color:inherit}
 .sheet td.none{color:var(--muted)}
 .sheet .unit{display:block; font-size:10px; font-weight:400; color:var(--muted)}
 
+/* ---- جمع ورود پول ---- */
+.flow .sheet-bar #flowFrom,.flow .sheet-bar #flowTo{width:104px; text-align:center}
+/* یک کارت بیشتر نیست (کل بازار) و اگر تمام عرض را بگیرد عددش وسط یک
+   نوار خالی گم می‌شود. */
+.flow-cards{
+  display:grid; gap:10px; padding:12px; justify-content:start;
+  grid-template-columns:repeat(auto-fit,minmax(240px,300px));
+}
+.flow-card{
+  border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+  background:var(--raised);
+}
+.flow-card .k{font-size:11.5px; color:var(--muted); margin-bottom:4px}
+.flow-card .v{
+  font-size:26px; font-weight:700; font-variant-numeric:tabular-nums;
+  letter-spacing:-.01em;
+}
+.flow-card .u{font-size:11px; color:var(--muted); margin-inline-start:4px; font-weight:400}
+.flow-card .s{font-size:11px; color:var(--muted); margin-top:3px}
+.flow-note{padding:0 12px 10px; font-size:11.5px; color:var(--muted)}
+.flow-head{
+  padding:10px 12px 6px; font-size:13px; font-weight:700; color:var(--ink);
+  border-top:1px solid var(--line); margin-top:4px;
+}
+.flow-head span{font-weight:400; font-size:11.5px; color:var(--muted); margin-inline-start:6px}
+.flow table{width:100%; min-width:520px}
+/* دو جدول پشت سر هم در یک ناحیهٔ اسکرول: سرسطرِ چسبان این‌جا بیشتر
+   گیج می‌کند تا کمک، چون دومی روی اولی می‌نشیند. */
+.flow th{position:static}
+.flow td.bar{width:34%; padding-block:4px}
+.flow .bar-wrap{position:relative; height:12px; background:var(--line-soft); border-radius:3px}
+.flow .bar-wrap i{
+  position:absolute; top:0; bottom:0; display:block; border-radius:3px;
+}
+.flow .bar-wrap .zero{
+  position:absolute; top:-2px; bottom:-2px; width:1px; background:var(--line);
+}
+.flow .pos{color:var(--up)}
+.flow .neg{color:var(--down)}
+.flow tfoot td{font-weight:700; border-top:1px solid var(--line)}
+
 /* ---- ناحیه نمودار ---- */
 .stage{
   position:relative; flex:1 1 auto; min-height:260px;
@@ -303,6 +344,26 @@ button{font:inherit;color:inherit}
     </div>
   </div>
 
+  <!-- جمع ورود پول بین دو تاریخ. ساختارش عمداً مثل جدول است (همان کارت،
+       همان نوار بالا) تا تبِ تازه بیگانه به‌نظر نرسد. -->
+  <div class="sheet flow" id="flow" hidden>
+    <div class="sheet-bar">
+      <label class="label" for="flowFrom">از تاریخ</label>
+      <input id="flowFrom" type="text" inputmode="numeric" placeholder="14050101" autocomplete="off">
+      <label class="label" for="flowTo">تا تاریخ</label>
+      <input id="flowTo" type="text" inputmode="numeric" placeholder="14050805" autocomplete="off">
+      <div class="seg" id="flowQuick"></div>
+      <span class="count" id="flowCount"></span>
+      <span class="sep"></span>
+      <button class="chip" id="flowCsv">دریافت CSV</button>
+    </div>
+    <div class="sheet-scroll" id="flowScroll">
+      <div class="flow-cards" id="flowCards"></div>
+      <div class="flow-note" id="flowNote"></div>
+      <div id="flowTables"></div>
+    </div>
+  </div>
+
   <div class="foot">
     <span>کشیدن برای جابه‌جایی · <kbd>اسکرول</kbd> برای بزرگ‌نمایی · دوضربه برای بازگشت به کل بازه</span>
     <span id="count"></span>
@@ -370,6 +431,11 @@ const VIEWS = [
   /* صنایع فقط جدول است، نه نمودار: سیزده ستون در یک نگاه کنار هم بیشتر
      به کار می‌آید تا سیزده نمودار که باید یکی‌یکی عوضشان کرد. */
   {id:"ind",     tab:"صنایع", sheet:true, ind:true, title:"دیده‌بان صنایع"},
+  /* جمع ورود پول بین دو تاریخ — هم کل بازار هم تفکیک صنایع.
+     `sheet:true` دارد تا همهٔ گاردهای «این نما بوم ندارد» همان‌طور کار
+     کنند؛ `flow:true` آن را از جدولِ معمولی جدا می‌کند. */
+  {id:"flow",    tab:"جمع ورود پول", sheet:true, flow:true,
+   title:"جمع ورود پول حقیقی"},
   {id:"sheet",   tab:"جدول", sheet:true, title:"جدول داده‌ها"},
 ];
 
@@ -1494,8 +1560,10 @@ function setView(id){
   state.view=id;
   const V=view();
   const isSheet = !!V.sheet;
+  const isFlow = !!V.flow;
   stage.hidden = isSheet;
-  sheetEl.hidden = !isSheet;
+  sheetEl.hidden = !isSheet || isFlow;
+  flowEl.hidden = !isFlow;
   document.getElementById("rangeRow").hidden = isSheet;
   document.querySelector(".foot").hidden = isSheet;
   document.getElementById("title").textContent = V.title || "";
@@ -1504,6 +1572,7 @@ function setView(id){
     b.setAttribute("aria-pressed", b.dataset.v===id?"true":"false"));
   if(isSheet){
     syncChips(); syncMaRow(); syncRsiRow(); syncOvRow();
+    if(isFlow){ ensureFlow(); return; }  // ensureFlow خودش پنل را می‌سازد
     if(V.ind){ ensureInd(); return; }   // ensureInd خودش جدول را می‌سازد
     renderSheet();
     return;
@@ -1691,7 +1760,7 @@ function renderSheet(){
   if(restRows>0) html += pad(restRows);
   bodyEl.innerHTML = html;
 }
-scrollEl.addEventListener("scroll", ()=>{ if(view().sheet) renderSheet(); });
+scrollEl.addEventListener("scroll", ()=>{ const V=view(); if(V.sheet && !V.flow) renderSheet(); });
 
 /* پریدن به یک تاریخ */
 document.getElementById("jump").addEventListener("input", e=>{
@@ -1727,26 +1796,28 @@ function buildCsv(){
   return "\uFEFF" + lines.join("\n");
 }
 
+async function saveCsv(filename, text){
+  const dl = window.claude?.use ? await window.claude.use("downloads") : null;
+  if(dl){
+    try { await dl.save({filename, data:text}); }
+    catch(err){ if(err?.code && err.code!=="declined") console.warn("downloads:", err.code); }
+    return;
+  }
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([text],{type:"text/csv;charset=utf-8"}));
+  a.download=filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
 const csvBtn = document.getElementById("csv");
 csvBtn.addEventListener("click", async ()=>{
   const V = view();
   const filename = (V.ind && state.ind)
     ? `bourse_ind${state.ind}_${DATA.d[N-1]}.csv`
     : `bourse_${DATA.d[N-1]}.csv`;
-  const text = buildCsv();
   csvBtn.disabled = true;
-  try{
-    const dl = window.claude?.use ? await window.claude.use("downloads") : null;
-    if(dl){
-      try { await dl.save({filename, data:text}); }
-      catch(err){ if(err?.code && err.code!=="declined") console.warn("downloads:", err.code); }
-      return;
-    }
-    const a=document.createElement("a");
-    a.href=URL.createObjectURL(new Blob([text],{type:"text/csv;charset=utf-8"}));
-    a.download=filename; a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-  } finally { csvBtn.disabled=false; }
+  try{ await saveCsv(filename, buildCsv()); }
+  finally { csvBtn.disabled=false; }
 });
 
 
@@ -2162,7 +2233,7 @@ const indChartLabel = document.getElementById("indChartLabel");
 /* تب‌های صنایع بی‌داده نمایش داده نمی‌شوند — مثل صفحهٔ تک‌فایلیِ محلی که
    نمی‌تواند کنار خودش فایل بخواند. */
 const indBlind = !IND.dir || !IND.codes.length;
-for(const id of ["ind","indval"]){
+for(const id of ["ind","indval","flow"]){
   const b = viewsRow.querySelector(`button[data-v="${id}"]`);
   if(b && indBlind) b.hidden = true;
 }
@@ -2307,6 +2378,250 @@ syncMaRow();
 syncRsiRow();
 syncOvRow();
 resize();
+
+
+/* ================= جمع ورود پول بین دو تاریخ =================
+
+   چرا یک تبِ جداگانه و نه یک عدد گوشهٔ نمودار: سؤال «از اول مهر تا
+   حالا چقدر پول حقیقی وارد شد» روی نمودار فقط برای کل بازار جا
+   می‌شود، در حالی که همان سؤال برای هر صنعت و هر سبد صندوق هم
+   پرسیده می‌شود.
+
+   سه بخشِ مستقل، نه یک فهرستِ درهم: کل بازار، صنایع، صندوق‌ها. هیچ‌کدام
+   قرار نیست جمعِ دیگری باشد — هر کدام جمعِ خودش در همان بازه است. اولین
+   نسخه هر سه را در یک جدول ریخته بود و شبیه یک تفکیکِ کل بازار دیده
+   می‌شد؛ نبود. */
+
+const flowEl    = document.getElementById("flow");
+const flowFrom  = document.getElementById("flowFrom");
+const flowTo    = document.getElementById("flowTo");
+const flowQuick = document.getElementById("flowQuick");
+const flowCount = document.getElementById("flowCount");
+const flowCards = document.getElementById("flowCards");
+const flowNote  = document.getElementById("flowNote");
+const flowTables= document.getElementById("flowTables");
+const flowCsvBtn= document.getElementById("flowCsv");
+
+/* کارت بالا فقط یکی است: کل بازار. صندوق‌ها جدول خودشان را دارند و
+   تکرارشان این‌جا همان درهم‌ریختگیِ نسخهٔ اول را برمی‌گرداند. */
+const FLOW_MARKET = [
+  {k:"flow_retail", n:"کل بازار", s:"سهام، حق تقدم و صندوق سهامی"},
+];
+
+/* کد صنعت عددی است و کد سبد صندوق نه — همین تفکیکشان می‌کند. */
+const isFundCode = c => !/^\d+$/.test(String(c));
+
+/* دکمه‌های میان‌بر. عددها «روز معاملاتی»اند نه روز تقویمی، چون محور
+   همین است: ۲۲ روز معاملاتی ≈ یک ماه. */
+const FLOW_QUICK = [
+  {n:"۱م", d:22}, {n:"۳م", d:64}, {n:"۶م", d:128}, {n:"۱س", d:250},
+  {n:"از ابتدای سال", ytd:true}, {n:"همه", all:true},
+];
+
+let FLOW = null;            // {کد صنعت: {i:[ردیف محور], f:[ورود پول]}}
+let flowState = "cold";     // cold | loading | ready | error
+let flowErrMsg = "";
+
+const HEMAT = 1000;         // ۱ همت = ۱۰۰۰ میلیارد تومان
+
+const normJ = s => {
+  const t = String(s||"").replace(/[^0-9۰-۹٠-٩]/g, "")
+    .replace(/[۰-۹]/g, c=>"۰۱۲۳۴۵۶۷۸۹".indexOf(c))
+    .replace(/[٠-٩]/g, c=>"٠١٢٣٤٥٦٧٨٩".indexOf(c));
+  return t.length===8 ? t : "";
+};
+
+/* بازهٔ انتخاب‌شده به شمارهٔ ردیف روی محور. تاریخی که روز معاملاتی نبوده
+   به نزدیک‌ترین روزِ *داخل* بازه می‌چسبد، نه بیرونش. */
+function flowRange(){
+  const a = normJ(flowFrom.value), b = normJ(flowTo.value);
+  let i0 = 0, i1 = N-1;
+  if(a){ i0 = DATA.d.findIndex(d => d >= a); if(i0 < 0) i0 = N; }
+  if(b){ i1 = -1; for(let i=N-1;i>=0;i--){ if(DATA.d[i] <= b){ i1 = i; break; } } }
+  return {i0, i1, ok: i0 <= i1 && i0 < N && i1 >= 0};
+}
+
+function setFlowRange(i0, i1){
+  flowFrom.value = DATA.d[Math.max(0, Math.min(N-1, i0))];
+  flowTo.value   = DATA.d[Math.max(0, Math.min(N-1, i1))];
+}
+
+function sumSeries(arr, i0, i1){
+  let s = 0, n = 0;
+  if(!arr) return {s:null, n:0};
+  for(let i=i0;i<=i1;i++){
+    const v = arr[i];
+    if(v==null || Number.isNaN(v)) continue;
+    s += v; n++;
+  }
+  return {s: n ? s : null, n};
+}
+
+/* جمع یک صنعت از همان آرایهٔ تُنُک — بدون باز کردنش روی کل محور. */
+function sumInd(code, i0, i1){
+  const o = FLOW && FLOW[code];
+  if(!o) return {s:null, n:0};
+  let s = 0, n = 0;
+  for(let p=0;p<o.i.length;p++){
+    const i = o.i[p];
+    if(i < i0) continue;
+    if(i > i1) break;
+    s += o.f[p]; n++;
+  }
+  return {s: n ? s : null, n};
+}
+
+const flowSign = v => v==null ? "" : (v > 0 ? "pos" : (v < 0 ? "neg" : ""));
+
+function flowBig(v){
+  if(v==null) return "—";
+  return nice(v, Math.abs(v) >= 100 ? 0 : 1);
+}
+
+function ensureFlow(){
+  if(flowState === "ready"){ renderFlow(); return; }
+  if(flowState === "loading") return;
+  if(!IND.flow){ flowState = "error"; flowErrMsg = "فهرست صنایع در این نسخه نیست."; renderFlow(); return; }
+  flowState = "loading";
+  renderFlow();
+  fetch(`${IND.flow}?v=${DATA.d[N-1]}`)
+    .then(r => { if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+    .then(j => { FLOW = j; flowState = "ready"; renderFlow(); })
+    .catch(e => { flowState = "error"; flowErrMsg = e.message; renderFlow(); });
+}
+
+function renderFlow(){
+  const R = flowRange();
+  if(!R.ok){
+    flowCount.textContent = "بازه خالی است";
+    flowCards.innerHTML = ""; flowTables.innerHTML = "";
+    flowNote.textContent = "تاریخ شروع باید پیش از تاریخ پایان باشد.";
+    return;
+  }
+  const {i0, i1} = R;
+  flowCount.textContent =
+    `${jDate(DATA.d[i0])} تا ${jDate(DATA.d[i1])} · ${fmt(i1-i0+1,0)} روز معاملاتی`;
+
+  const full = i1 - i0 + 1;
+
+  /* کارت بالا: کل بازار */
+  flowCards.innerHTML = FLOW_MARKET.map(m => {
+    const {s, n} = sumSeries(DATA[m.k], i0, i1);
+    const hem = (s!=null && Math.abs(s) >= HEMAT)
+      ? ` · ${nice(s/HEMAT, 1)} همت` : "";
+    return `<div class="flow-card">
+      <div class="k">${m.n} — ${m.s}</div>
+      <div class="v ${flowSign(s)}">${flowBig(s)}<span class="u">میلیارد تومان</span></div>
+      <div class="s">${n ? fmt(n,0)+" روز داده از "+fmt(full,0)+hem : "داده‌ای در این بازه نیست"}</div>
+    </div>`;
+  }).join("");
+
+  if(flowState === "loading"){
+    flowNote.textContent = "صنایع و صندوق‌ها در حال آمدن است…";
+    flowTables.innerHTML = "";
+    return;
+  }
+  if(flowState === "error"){
+    flowNote.textContent = `صنایع و صندوق‌ها نیامدند (${flowErrMsg}).`;
+    flowTables.innerHTML = "";
+    return;
+  }
+
+  flowNote.textContent = "هر عدد، جمعِ خودِ آن ردیف در همین بازه است — "
+    + "نه سهمی از کل بازار. سه بخش مستقل‌اند و جمعشان روی هم معنی ندارد.";
+
+  const all = IND.codes.map(c => {
+    const {s, n} = sumInd(String(c.c), i0, i1);
+    return {c:String(c.c), n:c.n, s, days:n};
+  }).filter(r => r.s != null);
+
+  flowTables.innerHTML =
+      flowTable("صنایع", all.filter(r => !isFundCode(r.c)), full)
+    + flowTable("صندوق‌ها", all.filter(r =>  isFundCode(r.c)), full);
+}
+
+/* یک جدول برای یک دسته. مقیاس میله در هر جدول از بزرگ‌ترینِ *همان*
+   دسته می‌آید: اگر مشترک بود، صندوق طلا همهٔ صنعت‌ها را صاف می‌کرد. */
+function flowTable(title, rows, full){
+  if(!rows.length){
+    return `<div class="flow-head">${title}</div>`
+      + `<div class="flow-note">در این بازه داده‌ای ندارد.</div>`;
+  }
+  rows = rows.slice().sort((a,b) => b.s - a.s);
+  const max = rows.reduce((a,r)=>Math.max(a, Math.abs(r.s)), 0) || 1;
+  const body = rows.map(r => {
+    const w = Math.abs(r.s) / max * 50;
+    /* میلهٔ دوطرفه: خط صفر وسط، مثبت یک طرف و منفی طرف دیگر، تا بدون
+       خواندن عدد هم معلوم باشد کدام پول گرفته و کدام داده. */
+    const side = r.s >= 0
+      ? `inset-inline-start:50%; width:${w}%; background:var(--up)`
+      : `inset-inline-end:50%; width:${w}%; background:var(--down)`;
+    const short = r.days < full;
+    return `<tr>
+      <td>${r.n}</td>
+      <td class="${flowSign(r.s)}">${flowBig(r.s)}</td>
+      <td class="bar"><div class="bar-wrap"><span class="zero" style="inset-inline-start:50%"></span><i style="${side}"></i></div></td>
+      <td class="${short ? "none" : ""}"${short
+        ? ` title="فقط ${fmt(r.days,0)} روز از ${fmt(full,0)} روزِ بازه داده دارد."` : ""
+        }>${fmt(r.days,0)}</td></tr>`;
+  }).join("");
+  return `<div class="flow-head">${title}<span>${fmt(rows.length,0)} ردیف</span></div>`
+    + `<table><thead><tr>
+        <th>${title === "صندوق‌ها" ? "سبد صندوق" : "صنعت"}</th>
+        <th>مجموع ورود پول حقیقی<span class="unit">میلیارد تومان</span></th>
+        <th>اندازه نسبت به بزرگ‌ترینِ همین بخش</th>
+        <th>روز داده<span class="unit">از ${fmt(full,0)} روز بازه</span></th>
+      </tr></thead><tbody>${body}</tbody></table>`;
+}
+
+FLOW_QUICK.forEach(q => {
+  const b = document.createElement("button");
+  b.textContent = q.n;
+  b.addEventListener("click", () => {
+    if(q.all) setFlowRange(0, N-1);
+    else if(q.ytd){
+      const y = DATA.d[N-1].slice(0,4);
+      let i = DATA.d.findIndex(d => d.slice(0,4) === y);
+      setFlowRange(i < 0 ? 0 : i, N-1);
+    } else setFlowRange(N-q.d, N-1);
+    renderFlow();
+  });
+  flowQuick.appendChild(b);
+});
+
+for(const el of [flowFrom, flowTo]){
+  el.addEventListener("change", renderFlow);
+  el.addEventListener("keydown", e => { if(e.key === "Enter") renderFlow(); });
+}
+
+flowCsvBtn.addEventListener("click", () => {
+  const R = flowRange();
+  if(!R.ok) return;
+  const {i0, i1} = R;
+  const lines = ["بخش,نام,مجموع ورود پول حقیقی (میلیارد تومان),روز داده"];
+  for(const m of FLOW_MARKET){
+    const {s, n} = sumSeries(DATA[m.k], i0, i1);
+    lines.push(`کل بازار,${m.n},${s==null?"":s.toFixed(1)},${n}`);
+  }
+  if(flowState === "ready"){
+    for(const c of IND.codes){
+      const {s, n} = sumInd(String(c.c), i0, i1);
+      if(s == null) continue;
+      lines.push(`${isFundCode(c.c) ? "صندوق‌ها" : "صنایع"},${c.n},${s.toFixed(1)},${n}`);
+    }
+  }
+  saveCsv(`bourse_flow_${DATA.d[i0]}_${DATA.d[i1]}.csv`, "﻿" + lines.join("\n"));
+});
+
+/* بازهٔ پیش‌فرض: یک ماه معاملاتی. */
+setFlowRange(N-22, N-1);
+
+/* برای تست‌های خودکار: همان توابع جمع، بدون عبور از DOM. */
+window.__dbg.flow = {
+  range: flowRange, setRange: setFlowRange, render: renderFlow,
+  sumSeries, sumInd, ensure: ensureFlow,
+  get data(){ return FLOW; }, get status(){ return flowState; },
+};
 
 };
 function load(){
