@@ -5,7 +5,7 @@
   --ground:#fbfbf9; --surface:#ffffff; --raised:#f4f4f0;
   --ink:#14150f; --ink-2:#4d4f46; --muted:#82857a;
   --line:#e4e4dd; --line-soft:#eeeee8; --edge:#cfd0c7;
-  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#a855c7; --s5:#b8860b; --s6:#0e7490;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#a855c7; --s5:#b8860b; --s6:#0e7490; --s7:#c2255c;
   --up:#0ca30c; --down:#d03b3b;
   --focus:#2a78d6;
   --shadow:0 1px 2px rgba(20,21,15,.06),0 8px 24px rgba(20,21,15,.07);
@@ -15,7 +15,7 @@
     --ground:#131410; --surface:#1b1c18; --raised:#232420;
     --ink:#f3f3ee; --ink-2:#c6c8bd; --muted:#8f9287;
     --line:#2b2d27; --line-soft:#232520; --edge:#3a3c35;
-    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#a855c7; --s5:#b8860b; --s6:#22a7c0;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#a855c7; --s5:#b8860b; --s6:#22a7c0; --s7:#f06595;
     --up:#2fb92f; --down:#e05c5c;
     --focus:#3987e5;
     --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.45);
@@ -25,7 +25,7 @@
   --ground:#131410; --surface:#1b1c18; --raised:#232420;
   --ink:#f3f3ee; --ink-2:#c6c8bd; --muted:#8f9287;
   --line:#2b2d27; --line-soft:#232520; --edge:#3a3c35;
-  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#a855c7; --s5:#b8860b; --s6:#22a7c0;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#a855c7; --s5:#b8860b; --s6:#22a7c0; --s7:#f06595;
   --up:#2fb92f; --down:#e05c5c;
   --focus:#3987e5;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.45);
@@ -87,6 +87,12 @@ button{font:inherit;color:inherit}
 
 /* ---- نوار میانگین متحرک ---- */
 #rsiInput{width:70px; text-align:center}
+.osc-p{width:46px; text-align:center}
+#oscKind{
+  font:inherit; font-size:12.5px; color:var(--ink); background:var(--surface);
+  border:1px solid var(--line); border-radius:7px; padding:4px 9px; width:auto;
+}
+#oscKind option:disabled{color:var(--muted)}
 .ma-input{
   font:inherit; font-size:12.5px; color:var(--ink); background:var(--surface);
   border:1px solid var(--line); border-radius:8px; padding:4px 10px; width:150px;
@@ -207,9 +213,26 @@ button{font:inherit;color:inherit}
 .flow .bar-wrap .zero{
   position:absolute; top:-2px; bottom:-2px; width:1px; background:var(--line);
 }
+.flow td.rmf, .flow th.rmf{text-align:center; font-variant-numeric:tabular-nums}
+.flow td.rmf{font-size:12px}
+#sheet td.pos{color:var(--up)}
+#sheet td.neg{color:var(--down)}
 .flow .pos{color:var(--up)}
 .flow .neg{color:var(--down)}
 .flow tfoot td{font-weight:700; border-top:1px solid var(--line)}
+
+/* ---- تمام‌صفحه ----
+   هدف همین است که نمودار پهن‌تر شود: حاشیهٔ کنارِ صفحه از ۱۶ به ۴
+   پیکسل می‌آید، کارت نمودار لبهٔ گرد و سایه‌اش را از دست می‌دهد (در
+   تمام‌صفحه چیزی پشتش نیست که از آن جدا شود) و سربرگ جمع‌تر می‌شود تا
+   ارتفاع هم به خودِ نمودار برسد. گوشه‌های کنوس در app.js هم در همین
+   حالت تنگ‌تر می‌شوند. */
+:fullscreen .app{padding-inline:4px; padding-block:8px 6px; gap:8px}
+:fullscreen .stage{border-radius:6px; box-shadow:none}
+:fullscreen .top{gap:10px}
+:fullscreen .brand h1{font-size:16px}
+:fullscreen .eyebrow{display:none}
+:fullscreen .quote .val{font-size:22px}
 
 /* ---- ناحیه نمودار ---- */
 .stage{
@@ -286,11 +309,17 @@ button{font:inherit;color:inherit}
       <span class="label">بازه</span>
       <div class="seg" id="ranges"></div>
       <span class="sep"></span>
+      <button class="chip" id="candleBtn" aria-pressed="false" hidden>
+        <span class="dot" id="candleDot"></span>شمعی
+      </button>
       <button class="chip" id="cmp" aria-pressed="false">مقایسه (پایه ۱۰۰)</button>
       <button class="chip" id="fs">تمام‌صفحه</button>
     </div>
     <div class="row" id="maRow">
       <span class="label">میانگین</span>
+      <button class="chip" id="maBtn" aria-pressed="true">
+        <span class="dot" id="maDot"></span>میانگین متحرک
+      </button>
       <div class="seg" id="maKind">
         <button type="button" data-k="ema" aria-pressed="true">EMA</button>
         <button type="button" data-k="sma" aria-pressed="false">SMA</button>
@@ -298,15 +327,40 @@ button{font:inherit;color:inherit}
       <input class="ma-input" id="maInput" type="text" inputmode="numeric"
              autocomplete="off" placeholder="۵۰، ۲۰۰">
       <span class="ma-swatches" id="maSwatches"></span>
-      <span class="sep"></span>
-      <button class="chip" id="rsiBtn" aria-pressed="false">
-        <span class="dot" id="rsiDot"></span>RSI
+    </div>
+    <div class="row" id="multiRow" hidden>
+      <span class="label">پنجره</span>
+      <button class="chip" id="mCndBtn" aria-pressed="true">
+        <span class="dot" id="mCndDot"></span>کندل شاخص
       </button>
-      <input class="ma-input" id="rsiInput" type="text" inputmode="numeric"
-             autocomplete="off" placeholder="۱۴" hidden>
+      <span class="gap"></span>
+      <button class="chip" id="mRsiBtn" aria-pressed="true">
+        <span class="dot" id="mRsiDot"></span>RSI
+      </button>
+      <input class="ma-input osc-p" id="mRsiP" type="text" inputmode="numeric"
+             autocomplete="off" placeholder="۱۴">
+      <span class="gap"></span>
+      <button class="chip" id="mRmfBtn" aria-pressed="true">
+        <span class="dot" id="mRmfDot"></span>RMF
+      </button>
+      <input class="ma-input osc-p" id="mRmfP" type="text" inputmode="numeric"
+             autocomplete="off" placeholder="۵">
+      <span class="gap"></span>
+      <button class="chip" id="mWrBtn" aria-pressed="true">
+        <span class="dot" id="mWrDot"></span>ویلیامز ٪R
+      </button>
+      <input class="ma-input osc-p" id="mWrP" type="text" inputmode="numeric"
+             autocomplete="off" placeholder="۱۴">
     </div>
     <div class="row" id="ovRow">
       <span class="label">اندیکاتور</span>
+      <button class="chip" id="rsiBtn" aria-pressed="false">
+        <span class="dot" id="rsiDot"></span><span id="rsiLabel">RSI</span>
+      </button>
+      <select id="oscKind"></select>
+      <input class="ma-input" id="rsiInput" type="text" inputmode="numeric"
+             autocomplete="off" placeholder="۱۴" hidden>
+      <span class="gap"></span>
       <button class="chip" id="vwapBtn" aria-pressed="false">
         <span class="dot" id="vwapDot"></span>VWAP
       </button>
@@ -380,6 +434,11 @@ window.__boot=function(DATA){
  * ------------------------------------------------------------------ */
 const SERIES = [
   {k:"index_total",  n:"شاخص کل",              u:"واحد",          ma:[50,200], dec:0},
+  /* سه سریِ کندل. hide یعنی در کشویی «سری» نمی‌آیند — خودشان نمودار
+     نیستند، فقط سقف و کف و بازِ شاخص کل‌اند. */
+  {k:"index_open",   n:"باز",                   u:"واحد", dec:0, hide:true},
+  {k:"index_high",   n:"سقف",                   u:"واحد", dec:0, hide:true},
+  {k:"index_low",    n:"کف",                    u:"واحد", dec:0, hide:true},
   {k:"index_ew",     n:"شاخص هم‌وزن",           u:"واحد",          ma:[50,200], dec:0},
   {k:"value_retail", n:"ارزش معاملات خرد",      u:"میلیارد تومان", ma:[7,21],   dec:0},
   {k:"flow_retail",  n:"ورود پول حقیقی", fn:"خالص ورود پول حقیقی به بازار",        u:"میلیارد تومان", ma:[7,21],   dec:0, signed:true},
@@ -400,12 +459,28 @@ const SERIES = [
   {k:"mv_gold",      n:"ارزش بازار به طلا",     u:"تن طلا",        ma:[50,200], dec:0},
   {k:"pe",           n:"P/E کل بازار",          u:"",              ma:[50,200], dec:2},
   {k:"m2",           n:"نقدینگی M2",            u:"همت",           ma:[50,200], dec:0},
+  /* ماهانه است، نه روزانه: یک نقطه روی اولین روز معاملاتیِ هر ماه. برای
+     همین میانگین متحرکش کوتاه است — MA۵۰ روی سری‌ای که ماهی یک نقطه
+     دارد یعنی چهار سال، که هیچ‌چیز را نشان نمی‌دهد. */
+  {k:"rfr",          n:"نرخ بهره بدون ریسک", fn:"بازده تا سررسید اسناد خزانه (میانه)", u:"درصد", ma:[3,12], dec:2, hole:45},
   {k:"ratio",        n:"ارزش بازار به نقدینگی", fn:"ارزش کل بازار ÷ نقدینگی M2", u:"نسبت",          ma:[50,200], dec:3, hide:true},
 ];
 
 /* هر «نما» یک چیدمان آماده است: سری اصلی، میانگین‌ها، و پنل پایین. */
 const VIEWS = [
   {id:"explore", tab:"نمای کلی", free:true, panel:"volume"},
+  /* سه اسیلاتورِ شاخص کل، بدون خودِ خط شاخص. بالا ستون ارزش معاملات
+     خرد با ستون داخلیِ ورود پول حقیقی، پایین هر سه اسیلاتور در یک
+     پنل و روی یک مقیاس.
+
+     ⚠ سری این نما «ارزش معاملات» است ولی RSI و ویلیامز روی **شاخص
+       کل** حساب می‌شوند، نه روی ارزش معاملات — وگرنه چیز دیگری را
+       اندازه می‌گرفتند. تنها جایی در برنامه که اسیلاتور از سریِ
+       رسم‌شده جدا می‌شود همین‌جاست. */
+  {id:"total",   tab:"اسیلاتورهای شاخص", key:"index_total", panel:"none",
+   multi:true, ema:[], title:"اسیلاتورهای شاخص کل",
+   note:"هر اسیلاتور پنجرهٔ خودش را دارد و محورش همان محور واقعیِ "
+        + "خودش است — بدون انتقال و بدون مقیاس مشترک"},
   {id:"ratio",   tab:"نسبت نقدینگی", key:"ratio", resample:true, ema:[28,110], panel:"none",
    title:"نسبت ارزش بازار به نقدینگی",
    note:"ارزش بازار ÷ نقدینگی M2"},
@@ -467,12 +542,18 @@ const state = {
   ind:null,            // کد صنعت انتخاب‌شده در تب صنایع
   ratioStep:"d",       // روزانه / هفتگی / ماهانه در تب نسبت نقدینگی
   maKind:"ema",
-  rsi:{},              // نما -> دورهٔ RSI، یا null یعنی خاموش
+  maOff:{},            // کلید نما -> میانگین‌ها خاموش باشند
+  candle:{},           // نما -> شمعی باشد یا خطی
+  rsi:{},              // نما -> پنل اسیلاتور روشن است یا نه
+  osc:"rsi",           // کدام اسیلاتور: rsi | wr | rmf
+  oscP:{},             // اسیلاتور -> طول پنجره (هر کدام پیش‌فرض خودش)
+  oscOn:{cnd:true, rsi:true, wr:true, rmf:true},  // در نمای چنداسیلاتوره
   ma:{},               // نما -> فهرست دوره‌ها؛ با پیش‌فرض همان نما پر می‌شود
   vwap:{},             // نما -> {anchor,k} یا null
   lrc:{},              // نما -> طول پنجره، یا null
   i0:Math.max(0,N-250), i1:N-1,
   hover:-1,
+  hoverY:null,         // جای عمودی نشانگر، برای خط افقیِ متقاطع
 };
 
 /* ---------- ابزارها ---------- */
@@ -571,6 +652,133 @@ function ema(arr,span){
   }
   return out;
 }
+/* ویلیامز ٪R — جای سری در بازهٔ سقف و کف همان پنجره.
+   صفر یعنی روی سقف پنجره، منفی صد یعنی روی کف.
+
+   ⚠ تعریف اصلی سقف و کف *درون‌روزی* می‌خواهد و ما فقط پایانی داریم،
+   پس سقف و کفِ پنجره از همان پایانی‌ها گرفته می‌شود. دامنه‌اش کمی
+   باریک‌تر از نسخهٔ استاندارد درمی‌آید؛ شکل و زمان‌بندی‌اش همان است. */
+function willrOf(arr, period){
+  const out=new Array(arr.length).fill(null);
+  const buf=[];
+  for(let i=0;i<arr.length;i++){
+    const v=arr[i];
+    if(v==null) continue;
+    buf.push(v);
+    if(buf.length>period) buf.shift();
+    if(buf.length<period) continue;
+    let hi=-Infinity, lo=Infinity;
+    for(const x of buf){ if(x>hi)hi=x; if(x<lo)lo=x; }
+    out[i] = hi===lo ? -50 : -100*(hi-v)/(hi-lo);
+  }
+  return out;
+}
+
+/* RMF-N — ورود پول حقیقی N روزه، تقسیم بر ارزش معاملات همان N روز،
+   بر حسب درصد. مقیاس‌ناپذیرش همین تقسیم است: هزار میلیارد ورود پول در
+   روزی که پنجاه هزار میلیارد معامله شده یعنی هیچ، و همان عدد در روزی
+   که ده هزار میلیارد معامله شده یعنی خیلی. */
+function rmfOf(period, pair){
+  const out = new Array(N).fill(null);
+  if(!pair) return out;
+  const f = pair.f, v = pair.v;
+  const fq = [], vq = [];
+  for(let i=0;i<N;i++){
+    if(f[i]==null || v[i]==null) continue;
+    fq.push(f[i]); vq.push(v[i]);
+    if(fq.length>period){ fq.shift(); vq.shift(); }
+    if(fq.length<period) continue;
+    let sf=0, sv=0;
+    for(let j=0;j<period;j++){ sf+=fq[j]; sv+=vq[j]; }
+    if(sv) out[i] = sf/sv*100;
+  }
+  return out;
+}
+
+/* ---------- کندل شاخص کل ----------
+   فقط برای شاخص کل داریم و فقط در قاب روزانه معنی دارد.
+
+   ⚠ دو نکته که از منبع می‌آید و این‌جا جبران می‌شود:
+
+   ۱. «باز» قیمتِ بازگشایی نیست؛ در ۹۹.۹٪ روزها دقیقاً پایانیِ روز قبل
+      است. برای شاخص همین مرسوم است (خودِ تریدرزآرنا هم همین را می‌کشد)،
+      ولی یعنی بدنهٔ شمع «تغییر نسبت به دیروز» را نشان می‌دهد.
+
+   ۲. در حدود ۹.۵٪ روزها پایانی بیرونِ بازهٔ سقف و کف می‌افتد، چون سقف و
+      کف از شاخص لحظه‌ای می‌آیند و پایانی از شاخص پایانی. اگر دست نخورد،
+      بدنه از سایه می‌زند بیرون و شمع بدریخت می‌شود؛ پس سایه تا باز و
+      بسته گسترش داده می‌شود. هیچ عددی ساخته نمی‌شود — فقط بازه‌ای که
+      رسم می‌شود همهٔ چهار عدد را در بر می‌گیرد. */
+const CANDLE_KEY = "index_total";
+function candleReady(){
+  return frame().id === "day" && plan().keys.length === 1
+    && plan().keys[0] === CANDLE_KEY
+    && !!(DATA.index_open && DATA.index_high && DATA.index_low);
+}
+function candles(){
+  return cached("candles", () => {
+    const o = DATA.index_open, h = DATA.index_high,
+          l = DATA.index_low,  c = DATA[CANDLE_KEY];
+    if(!o || !h || !l || !c) return null;
+    const out = new Array(N).fill(null);
+    for(let i=0;i<N;i++){
+      if(o[i]==null || h[i]==null || l[i]==null || c[i]==null) continue;
+      out[i] = {o:o[i], c:c[i],
+                h:Math.max(h[i], o[i], c[i]),
+                l:Math.min(l[i], o[i], c[i])};
+    }
+    return out;
+  });
+}
+const candleOn = () => !!state.candle[state.view] && candleReady();
+
+/* ---------- سطوح انباشت ----------
+   همان الگوریتم signals.py، این بار در مرورگر: روزی «انباشت» است که
+   سهم ورود پول حقیقیِ پنج‌روزه از ارزش معاملات بالای ۴٪ باشد **و**
+   ارزش معاملات همان روز بالای میانگین بیست‌روزه. روزهای نزدیک به هم
+   یک خوشه می‌شوند، و سطح خوشه میانگین شاخص با وزن ارزش معاملات است —
+   یعنی قیمتی که پول واقعاً آن‌جا وارد شده، نه وسط بازهٔ قیمتی.
+
+   ⚠ فعلاً هیچ نمایی این را نمی‌کشد: روی نمای اسیلاتورها محور عمودی
+     واحدِ شاخص نیست و خط افقی آن‌جا معنی ندارد. نگه داشته شده چون
+     تنها پیاده‌سازی مرورگریِ این الگوریتم است و تست، آستانه‌هایش را
+     با signals.py قفل می‌کند؛ هر نمایی که محور شاخص داشته باشد
+     می‌تواند صدایش بزند. */
+const ACC_SHARE = 0.04, ACC_WIN = 5, ACC_MA = 20, ACC_GAP = 10, ACC_MAX = 6;
+function accumLevels(){
+  return cached("accum", () => {
+    const g = DATA.index_total, f = DATA.flow_retail, v = DATA.value_retail;
+    if(!g || !f || !v) return [];
+    const ix = [];
+    for(let i=0;i<N;i++) if(g[i]!=null && f[i]!=null && v[i]!=null) ix.push(i);
+    if(ix.length < ACC_MA + ACC_WIN) return [];
+    const hits = [];
+    let run = 0;
+    for(let p=0;p<ix.length;p++){
+      run += v[ix[p]];
+      if(p >= ACC_MA) run -= v[ix[p-ACC_MA]];
+      if(p < ACC_MA-1) continue;
+      const ma = run/ACC_MA;
+      let v5=0, f5=0;
+      for(let q=p-ACC_WIN+1;q<=p;q++){ v5 += v[ix[q]]; f5 += f[ix[q]]; }
+      if(!v5 || !ma) continue;
+      if(f5/v5 > ACC_SHARE && v[ix[p]] > ma) hits.push(p);
+    }
+    const cl = [];
+    for(const p of hits){
+      const last = cl[cl.length-1];
+      if(last && p - last[last.length-1] <= ACC_GAP) last.push(p);
+      else cl.push([p]);
+    }
+    return cl.slice(-ACC_MAX).map(c => {
+      let w=0, sum=0;
+      for(const p of c){ w += v[ix[p]]; sum += g[ix[p]]*v[ix[p]]; }
+      return {level: sum/w, i0: ix[c[0]], i1: ix[c[c.length-1]],
+              days: c.length};
+    });
+  });
+}
+
 /* شاخص قدرت نسبی، به روش وایلدر.
    روزهای بی‌داده رد می‌شوند و مرجعِ تفاضل، آخرین مقدار معتبر است — نه صفر.
    تا وقتی «period» تفاضل واقعی جمع نشده خروجی نمی‌دهد. */
@@ -754,11 +962,105 @@ function overlays(PL){
   return out;
 }
 
-/* دورهٔ RSI نمای جاری — null یعنی خاموش */
-function rsiPeriod(){
-  const id=state.view;
-  return (id in state.rsi) ? state.rsi[id] : null;
+/* سه اسیلاتور. دامنهٔ RSI و ویلیامز ثابت است نه کشویی: اسیلاتوری که
+   محورش با داده بزرگ و کوچک شود، «۷۰» و «۳۰»اش دیگر جای ثابتی روی
+   صفحه ندارد و چشم نمی‌تواند دو روز را مقایسه کند. RMF استثناست —
+   درصدِ علامت‌دار است و سقف طبیعی ندارد، پس با داده مقیاس می‌گیرد و
+   در عوض خط صفرش همیشه سر جایش است.
+
+   flow:"need" یعنی بی‌جریان پول حقیقی هیچ خطی ندارد. */
+const OSC = [
+  {id:"rsi", n:"RSI",         lo:0,    hi:100, bands:[30,70],   def:14},
+  {id:"wr",  n:"ویلیامز ٪R",  lo:-100, hi:0,   bands:[-80,-20],
+   mid:-50, def:14},
+  {id:"rmf", n:"RMF", fn:"RMF — سهم ورود پول از ارزش معاملات",
+   sn:"RMF — سهم ورود پول", bands:[-4,4], mid:0, def:5,
+   auto:true, flow:"need"},
+];
+const OSC_DEFAULT = "rsi";
+const oscDef = () => OSC.find(o=>o.id===state.osc) || OSC[0];
+
+/* کدام جفتِ «ورود پول / ارزش معاملات» به این نمودار می‌خورد.
+
+   ⚠ در تب صنایع جفتِ خودِ همان صنعت برمی‌گردد، نه جریان کل بازار:
+   گذاشتن RMF بازار کنار نمودار یک صنعت، عددی درست را جای غلط نشان
+   می‌دهد و بدتر از نشان‌ندادنش است.
+
+   null یعنی این نمودار جریان پول ندارد — قاب هفتگی و ماهانه (که
+   ردیف‌هاشان با روزها یکی نیست)، و سری‌هایی که NO_VOLUME نشانشان
+   کرده: طلا، دلار، نقدینگی، خودِ ارزش معاملات. */
+function flowPair(){
+  if(frame().id !== "day") return null;
+  const V = view();
+  /* نمای اسیلاتورها: سریِ رسم‌شده خودِ ارزش معاملات است و در NO_VOLUME
+     می‌افتد، ولی اسیلاتورهایش مال کل بازارند — پس جفت بازار برمی‌گردد. */
+  if(V.multi) return (DATA.flow_retail && DATA.value_retail)
+    ? {f:DATA.flow_retail, v:DATA.value_retail, id:"mkt"} : null;
+  if(V.indBars){
+    const c = state.ind;
+    if(!c) return null;
+    const f = DATA[indKey(c,"flow")], v = DATA[indKey(c,"value")];
+    return (f && v) ? {f, v, id:"ind"+c, ind:true} : null;
+  }
+  if(!DATA.flow_retail || !DATA.value_retail) return null;
+  const keys = plan().keys || [];
+  if(keys.length!==1 || NO_VOLUME.has(keys[0])) return null;
+  return {f:DATA.flow_retail, v:DATA.value_retail, id:"mkt"};
 }
+function flowUsable(){ return !!flowPair(); }
+function oscUsable(id){
+  const o = OSC.find(x=>x.id===id);
+  if(!o) return false;
+  return o.flow === "need" ? flowUsable() : true;
+}
+
+/* دورهٔ اسیلاتور — null یعنی پنل خاموش. روشن/خاموش به نما بسته است و
+   طول پنجره به خودِ اسیلاتور: RMF پنج‌روزه است و RSI چهارده‌روزه، پس
+   عوض‌کردن اسیلاتور نباید دورهٔ آن یکی را خراب کند. */
+function rsiPeriod(){
+  if(!state.rsi[state.view]) return null;
+  return state.oscP[state.osc] || oscDef().def;
+}
+
+/* خط‌های اسیلاتور جاری. ویلیامز دو خط است: یکی روی قیمت، یکی روی
+   مجموع تجمعی ورود پول حقیقی. حرف اصلی همان خط دوم است — عبور ٪R
+   قیمت به‌تنهایی تقریباً هیچ نمی‌گوید. */
+function oscLines(arr, period){ return oscLinesOf(state.osc, arr, period); }
+function oscLinesOf(id, arr, period){
+  const o = OSC.find(x=>x.id===id) || OSC[0];
+  if(o.id === "rmf"){
+    const pair = flowPair();
+    if(!pair) return [];
+    return [{a:rmfOf(period, pair), color:css("--s7"), n:"RMF",
+             tn:`RMF ${pnum(period)}`, dec:1, unit:"٪"}];
+  }
+  if(o.id === "wr"){
+    return [{a:willrOf(arr, period), color:css("--s4"), n:"ویلیامز ٪R",
+             tn:`ویلیامز ٪R ${pnum(period)}`}];
+  }
+  return [{a:rsiOf(arr, period), color:css("--s4"), n:"RSI",
+           tn:`RSI ${pnum(period)}`}];
+}
+
+/* ---------- نمای چنداسیلاتوره ----------
+   هر اسیلاتور پنجرهٔ خودش را دارد و محورش همان محور واقعیِ خودش است:
+   RSI صفر تا صد، RMF درصدِ علامت‌دار حول صفر، ویلیامز منفی‌صد تا صفر.
+
+   ⚠ نسخهٔ اول اینها را به یک مقیاس مشترک صفر تا صد می‌برد تا در یک
+     پنل جا شوند. نتیجه‌اش این بود که ویلیامزِ ‎−۵۸ روی ۴۲ می‌نشست و
+     صفرِ RMF روی ۵۰ — یعنی عددِ محور دیگر عددِ اندیکاتور نبود و
+     خواننده را گمراه می‌کرد. حالا هیچ انتقالی در کار نیست.
+
+/* ترتیب پنجره‌ها از بالا به پایین. «cnd» اسیلاتور نیست — شمعِ خودِ
+   شاخص است و بالای همه می‌نشیند، با سهم بیشتری از ارتفاع چون چیزی که
+   در آن دیده می‌شود (سقف و کف و بدنه) ریزتر از خط اسیلاتور است. */
+const MULTI_ORDER = ["cnd", "rsi", "rmf", "wr"];
+const MULTI_WEIGHT = {cnd: 1.9};
+const panelUsable = id => id === "cnd" ? candleReady() : oscUsable(id);
+const oscPeriodOf = id =>
+  state.oscP[id] || (OSC.find(o=>o.id===id)||{}).def || 14;
+const multiOn = () => view().multi
+  && MULTI_ORDER.some(id => state.oscOn[id] && panelUsable(id));
 
 /* آخرین روزی که این سری داده دارد */
 function lastValid(k){
@@ -767,18 +1069,46 @@ function lastValid(k){
   return n-1;
 }
 
+/* ---------- ناحیه‌های مقیاس‌دار ----------
+   خط افقیِ نشانگر باید کنارش عدد بنویسد، و عدد به این بستگی دارد که
+   نشانگر روی کدام ناحیه ایستاده: نمودار اصلی، پنل ارزش معاملات، یا
+   هر کدام از پنجره‌های اسیلاتور. هر بخشِ draw که مقیاس عمودی خودش را
+   می‌سازد، همان‌جا ناحیه‌اش را این‌جا ثبت می‌کند. */
+let REGIONS = [];
+function region(top, bot, lo, hi, dec, unit){
+  if(!(bot>top) || !(hi>lo)) return;
+  REGIONS.push({top, bot, lo, hi, dec, unit});
+}
+function regionAt(y){
+  for(const r of REGIONS) if(y>=r.top-1 && y<=r.bot+1) return r;
+  return null;
+}
+
 /* ---------- بوم ---------- */
 const stage=document.getElementById("stage"), cv=document.getElementById("cv");
 const ctx=cv.getContext("2d"), tip=document.getElementById("tip");
 let W=0,H=0,DPR=1;
 const PAD={t:14,r:62,b:26,l:12};
+/* در تمام‌صفحه هر پیکسلِ حاشیه حیف است: ستون چپ و بالا تنگ‌تر می‌شوند
+   و کفِ ستون راست هم پایین می‌آید (برچسب‌ها اگر پهن‌تر باشند خودشان
+   ستون را باز می‌کنند، پس چیزی بریده نمی‌شود). */
+const isFS = () => !!document.fullscreenElement;
 /* پهنای ستون برچسب‌های محور عمودی. قیمت طلا هشت‌رقمی است و در ۶۲ پیکسل جا
    نمی‌شود؛ پس بعد از اندازه‌گیریِ پهن‌ترین برچسب، یک بار دوباره چیده می‌شود. */
 let GUTTER = 62;
 let relaying = false;
-function pad(){ return {...PAD, r: Math.max(W<560?52:62, GUTTER)}; }
+function pad(){
+  const fs = isFS();
+  return {...PAD,
+          l: fs ? 4 : PAD.l,
+          t: fs ? 10 : PAD.t,
+          r: Math.max(fs ? 46 : (W<560?52:62), GUTTER)};
+}
 const PANEL_H=0.20;             // سهم پنل سری از ارتفاع
-const RSI_H=0.20;               // سهم پنل RSI
+const RSI_H=0.20;               // سهم پنل اسیلاتور
+/* در نمای اسیلاتورها، پنل پایین خودِ موضوع است نه حاشیه — پس دو برابر
+   سهم می‌گیرد و ستون‌های ارزش معاملات بالایش جمع‌تر می‌شوند. */
+const RSI_H_MULTI=0.42;
 
 function resize(){
   const r=stage.getBoundingClientRect();
@@ -794,8 +1124,33 @@ function layout(){
   const P=pad();
   const V=view();
   const hasPanel = !V.sheet && plan().panel!=="none";
-  const hasRsi   = !V.sheet && rsiPeriod()!=null;
+  const hasRsi   = !V.sheet && (V.multi ? multiOn() : rsiPeriod()!=null);
   const inner = H-P.t-P.b;
+
+  /* نمای اسیلاتورها: نمودار اصلی ندارد. کل ارتفاع بین پنجره‌های
+     روشن تقسیم می‌شود، به ترتیبِ خواسته‌شده از بالا به پایین.
+     خاموش‌کردن یکی، فضایش را به بقیه می‌دهد. */
+  if(V.multi){
+    const ids = MULTI_ORDER.filter(id => state.oscOn[id] && panelUsable(id));
+    const GAP = 16;
+    const out = {x0:P.l, x1:W-P.r, mainTop:P.t, mainBot:P.t,
+                 panelTop:null, panelBot:null, hasPanel:false,
+                 rsiTop:null, rsiBot:null, hasRsi:false,
+                 oscPanels:[], bottom:H-P.b};
+    if(!ids.length) return out;
+    const wsum = ids.reduce((a,id)=>a+(MULTI_WEIGHT[id]||1), 0);
+    const unit = (inner - GAP*(ids.length-1)) / wsum;
+    let top = P.t;
+    for(const id of ids){
+      const h = unit * (MULTI_WEIGHT[id]||1);
+      out.oscPanels.push({id, top:Math.round(top), bot:Math.round(top+h)});
+      top += h + GAP;
+    }
+    out.mainTop = P.t;
+    out.mainBot = out.oscPanels[0].top;
+    out.bottom = out.oscPanels[out.oscPanels.length-1].bot;
+    return out;
+  }
 
   /* از پایین به بالا چیده می‌شود: RSI پایین‌ترین، بعد پنل سری، بعد نمودار اصلی */
   let bot = H-P.b;
@@ -810,7 +1165,7 @@ function layout(){
     x0:P.l, x1:W-P.r,
     mainTop:P.t, mainBot:bot,
     panelTop, panelBot, hasPanel,
-    rsiTop, rsiBot, hasRsi,
+    rsiTop, rsiBot, hasRsi, oscPanels:null,
     bottom: rsiBot ?? panelBot ?? (H-P.b),
   };
 }
@@ -861,6 +1216,14 @@ function maPeriods(){
   if(!(id in state.ma)) state.ma[id] = maDefaults();
   return state.ma[id];
 }
+/* دوره‌هایی که واقعاً رسم می‌شوند.
+
+   ⚠ از maPeriods جداست چون کادرِ دوره‌ها باید عددهایش را نگه دارد حتی
+     وقتی میانگین خاموش است — روشن که شد، همان‌ها برمی‌گردند. پاک‌کردنِ
+     کادر هم «برگرد به پیش‌فرض» است نه «خاموش»، پس خاموشی کلید خودش را
+     لازم دارد. */
+const maOn = () => !state.maOff[maKey()];
+const maList = () => maOn() ? maPeriods() : [];
 
 /* ارزش معاملات خرد ستونی رسم می‌شود نه خطی، و خالص ورود پول هم ستونِ
    باریک‌ترِ داخلِ همان ستون. هر دو روی یک مقیاس‌اند، پس ستون رنگی واقعاً
@@ -881,23 +1244,24 @@ function plan(){
   if(V.indBars){
     const c=state.ind;
     if(!c) return {keys:[], indexed:false, ma:null, panel:"none"};
-    return {keys:[indKey(c,"value")], indexed:false, ma:maPeriods(),
+    return {keys:[indKey(c,"value")], indexed:false, ma:maList(),
             maKind:state.maKind, panel:"none",
             bars:true, barFlow:indKey(c,"flow")};
   }
-  if(V.lines) return {keys:V.lines, indexed:false, ma:maPeriods(),
+  if(V.lines) return {keys:V.lines, indexed:false, ma:maList(),
                       maKind:state.maKind, panel:V.panel, dual:!!V.dual};
-  if(V.resample) return {keys:[ratioKey()], indexed:false, ma:maPeriods(),
+  if(V.resample) return {keys:[ratioKey()], indexed:false, ma:maList(),
                          maKind:state.maKind, panel:V.panel, hole:ratioStep().hole,
                          labels:frame().labels || null};
-  if(!V.free) return {keys:[V.key], indexed:false, ma:maPeriods(),
+  if(!V.free) return {keys:[V.key], indexed:false, ma:maList(),
                       maKind:state.maKind, panel:V.panel, bars:barKey([V.key]),
-                      barFlow:BAR_FLOW};
+                      hole:seriesHole([V.key]), barFlow:BAR_FLOW};
   const keys = state.cmpMode && state.compare.length ? state.compare : [state.key];
   const indexed = keys.length>1;
   const showVol = !keys.every(k => NO_VOLUME.has(k));
   return {keys, indexed, bars:barKey(keys), barFlow:BAR_FLOW,
-          ma: indexed ? null : maPeriods(), maKind:state.maKind,
+          ma: indexed ? null : maList(), maKind:state.maKind,
+          hole: seriesHole(keys),
           panel: showVol ? "volume" : "none"};
 }
 
@@ -908,6 +1272,17 @@ function plan(){
 const MAX_HOLE = 6;
 /* hole را صدازننده می‌تواند بزرگ‌تر کند: سری هفتگی هر پنج ردیف یک نقطه
    دارد و ماهانه هر بیست ردیف، پس با حفرهٔ شش‌تایی خط‌خطی می‌شدند. */
+/* سریِ ماهانه روی محورِ روز معاملاتی هر ماه یک نقطه دارد و بینشان بیست
+   ردیف خالی است. با حفرهٔ پیش‌فرضِ شش‌تایی، خط هیچ‌وقت وصل نمی‌شود و
+   هفتادوهشت نقطه مثل هفتادوهشت نقطهٔ جدا دیده می‌شوند — دقیقاً همان
+   چیزی که اولین بار سرِ «نرخ بدون ریسک» دیدیم. حفره از خودِ تعریف سری
+   می‌آید تا این دانش یک جا بماند، نه پخشِ شرط‌های موردی در کد ترسیم. */
+function seriesHole(keys){
+  let h = 0;
+  for(const k of keys || []) h = Math.max(h, fa(k)?.hole || 0);
+  return h || undefined;
+}
+
 function strokeSeries(a, L, yAt, hole){
   const H = hole || MAX_HOLE;
   ctx.beginPath();
@@ -922,6 +1297,204 @@ function strokeSeries(a, L, yAt, hole){
 }
 
 /* ---------- ترسیم ---------- */
+/* ---------- پنجرهٔ شمعِ شاخص ----------
+   همان شمع‌های «نمای کلی»، این بار در یک پنجرهٔ مستقل بالای
+   اسیلاتورها و با محور عمودی خودش. */
+function candlePanel(L, top, bot, muted, line, surf, up, down){
+  const CD = candles();
+  if(!CD) return null;
+  let lo=Infinity, hi=-Infinity;
+  for(let i=state.i0;i<=state.i1;i++){
+    const k=CD[i]; if(!k) continue;
+    if(k.l<lo) lo=k.l;
+    if(k.h>hi) hi=k.h;
+  }
+  if(!isFinite(lo)) return null;
+  if(lo===hi){ lo-=1; hi+=1; }
+  const pd=(hi-lo)*0.06; lo-=pd; hi+=pd;
+  const ry = v => bot - (v-lo)/(hi-lo)*(bot-top);
+  region(top, bot, lo, hi, 0, "");
+
+  /* شبکهٔ افقی و برچسب محور، هم‌شکل نمودار اصلی */
+  const CELL = W<560 ? 34 : 42;
+  ctx.strokeStyle=css("--line-soft"); ctx.lineWidth=1;
+  ctx.fillStyle=muted; ctx.textAlign="left";
+  ctx.font='10px Vazirmatn,system-ui,sans-serif';
+  const rows = Math.max(2, Math.round((bot-top)/CELL));
+  for(const t of ticks(lo,hi,rows)){
+    const y=Math.round(ry(t))+.5;
+    if(y<top||y>bot) continue;
+    ctx.beginPath(); ctx.moveTo(L.x0,y); ctx.lineTo(L.x1,y); ctx.stroke();
+    ctx.fillText(nice(t,0), L.x1+7, y);
+  }
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(L.x0, top-1, L.x1-L.x0, bot-top+2); ctx.clip();
+  const slotW=(L.x1-L.x0)/Math.max(1,(state.i1-state.i0+1));
+  const bw=Math.max(1, Math.min(14, slotW-1.5));
+  const thin = bw < 2.5;
+  ctx.lineWidth=1;
+  for(let i=state.i0;i<=state.i1;i++){
+    const k=CD[i]; if(!k) continue;
+    const x=xAt(i,L), col = k.c>=k.o ? up : down;
+    ctx.strokeStyle=col; ctx.fillStyle=col;
+    const xs=Math.round(x)+.5;
+    ctx.beginPath(); ctx.moveTo(xs, ry(k.h)); ctx.lineTo(xs, ry(k.l)); ctx.stroke();
+    if(thin) continue;
+    const y0=ry(Math.max(k.o,k.c)), y1=ry(Math.min(k.o,k.c));
+    ctx.fillRect(x-bw/2, y0, bw, Math.max(1, y1-y0));
+  }
+  ctx.restore();
+
+  /* سرنویس: نام سری و آخرین پایانی */
+  if(W>=520){
+    let last=null;
+    for(let i=state.i1;i>=state.i0;i--) if(CD[i]){ last=CD[i]; break; }
+    const txt = last ? `شاخص کل ${nice(last.c,0)}` : "شاخص کل";
+    const ty = top+8;
+    ctx.textAlign="right";
+    const w = ctx.measureText(txt).width;
+    ctx.save(); ctx.globalAlpha=.82; ctx.fillStyle=surf;
+    roundRectPath(L.x1-10-w, ty-9, w+14, 18, 4); ctx.fill(); ctx.restore();
+    ctx.fillStyle = last ? (last.c>=last.o?up:down) : muted;
+    ctx.fillText(txt, L.x1-6, ty);
+  }
+  ctx.font='11px Vazirmatn,system-ui,sans-serif';
+
+  ctx.strokeStyle=line; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(L.x0,Math.round(top-7)+.5); ctx.lineTo(L.x1,Math.round(top-7)+.5);
+  ctx.stroke();
+  return CD;
+}
+
+/* ---------- یک پنجرهٔ اسیلاتور ----------
+   هر پنجره محور واقعیِ خودِ اسیلاتور را دارد: RSI صفر تا صد، ویلیامز
+   منفی‌صد تا صفر، RMF درصدِ علامت‌دار حول صفر. هیچ انتقالی در کار
+   نیست، پس عددِ روی محور همان عددِ اندیکاتور است. */
+function oscPanel(L, top, bot, od, lines, period, muted, line, surf){
+  /* دامنهٔ عمودی. ثابت برای RSI و ویلیامز؛ برای RMF با داده، ولی
+     متقارن حول صفر تا «مثبت» و «منفی» نیم‌به‌نیم بمانند.
+
+     مقیاس از صدک ۹۷ گرفته می‌شود نه از بیشینه: یک روزِ ‎−۵۲٪ وگرنه
+     کل سه سال بقیه را به یک نوار باریک وسط می‌چسباند. کفِ دامنه هم
+     سه برابر نوار است تا ‎±۴ همیشه جای دیدنی داشته باشد. روزهای
+     بیرون از دامنه بریده می‌شوند، پس پنجره برش می‌خورد. */
+  let lo = od.lo, hi = od.hi;
+  if(od.auto){
+    const mags = [];
+    for(const ln of lines)
+      for(let i=state.i0;i<=state.i1;i++)
+        if(ln.a[i]!=null) mags.push(Math.abs(ln.a[i]));
+    mags.sort((a,b)=>a-b);
+    const p97 = mags.length ? mags[Math.min(mags.length-1,
+                 Math.floor(mags.length*0.97))] : 0;
+    const m = Math.max(Math.abs(od.bands[1])*3, p97*1.08);
+    lo = -m; hi = m;
+  }
+  const ry = v => bot - ((v-lo)/(hi-lo))*(bot-top);
+  region(top, bot, lo, hi, 1, od.auto ? "٪" : "");
+
+  /* نوار میانی: جایی که هیچ سیگنالی نیست */
+  ctx.save(); ctx.globalAlpha=.05; ctx.fillStyle=css("--ink");
+  ctx.fillRect(L.x0, ry(od.bands[1]), L.x1-L.x0,
+               ry(od.bands[0])-ry(od.bands[1])); ctx.restore();
+
+  ctx.save(); ctx.setLineDash([3,3]); ctx.strokeStyle=css("--edge");
+  ctx.lineWidth=1;
+  for(const lv of od.bands){
+    const y=Math.round(ry(lv))+.5;
+    ctx.beginPath(); ctx.moveTo(L.x0,y); ctx.lineTo(L.x1,y); ctx.stroke();
+  }
+  ctx.restore();
+
+  /* خط مرجع میانه: برای ویلیامز ‎−۵۰ و برای RMF صفر — نقطهٔ بی‌طرفِ
+     هر کدام، که نوارهای اشباع نسبت به آن خوانده می‌شوند. */
+  if(od.mid != null){
+    ctx.save(); ctx.strokeStyle=css("--edge"); ctx.lineWidth=1;
+    ctx.globalAlpha=.8;
+    const y=Math.round(ry(od.mid))+.5;
+    ctx.beginPath(); ctx.moveTo(L.x0,y); ctx.lineTo(L.x1,y); ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(L.x0, top-1, L.x1-L.x0, bot-top+2);
+  ctx.clip();
+  ctx.lineJoin="round"; ctx.lineCap="round";
+  for(const ln of lines){
+    ctx.strokeStyle = ln.color; ctx.lineWidth = 1.5;
+    ctx.save();
+    if(ln.dash) ctx.setLineDash(ln.dash);
+    strokeSeries(ln.a, L, ry);
+    ctx.restore();
+  }
+  ctx.restore();
+
+  /* برچسب محور: خط میانه اولویت دارد، و هر برچسب بعدی فقط وقتی
+     می‌آید که با قبلی‌ها تصادف نکند — پنجره کوتاه است. */
+  ctx.fillStyle=muted; ctx.textAlign="left";
+  ctx.font='10px Vazirmatn,system-ui,sans-serif';
+  const taken=[], unit = od.auto ? "٪" : "";
+  const tick = lv => {
+    const y = ry(lv);
+    if(y < top-1 || y > bot+1) return;
+    if(taken.some(t => Math.abs(t-y) < 9)) return;
+    taken.push(y);
+    ctx.fillText(nice(lv, 0) + unit, L.x1+7, y);
+  };
+  for(const lv of od.bands) tick(lv);
+  if(od.mid != null) tick(od.mid);
+
+  /* سرنویس: نام اسیلاتور و دوره‌اش، و مقدار واقعی آخرین روز هر خط. */
+  if(W>=520){
+    const ty = top+8;
+    const lastOf = a => {
+      for(let i=state.i1;i>=state.i0;i--) if(a[i]!=null) return a[i];
+      return null;
+    };
+    const tag = ln => {
+      const v = lastOf(ln.a);
+      return v==null ? ln.n
+        : `${ln.n} ${nice(v, ln.dec==null?1:ln.dec)}${ln.unit||""}`;
+    };
+    ctx.textAlign="right";
+    let x = L.x1-6;
+    if(!lines.length){
+      ctx.fillStyle=muted;
+      ctx.fillText("جریان پول این سری را ندارد", x, ty);
+    } else {
+      let wTot = 0;
+      for(const ln of lines) wTot += ctx.measureText(tag(ln)).width + 23;
+      wTot += ctx.measureText(pnum(period)).width + 10;
+      ctx.save(); ctx.globalAlpha=.82; ctx.fillStyle=surf;
+      roundRectPath(L.x1-4-wTot, ty-9, wTot+8, 18, 4); ctx.fill();
+      ctx.restore();
+      /* راست‌چین است، پس از راست به چپ: اول نقطه، بعد نام سمت چپش. */
+      for(const ln of lines){
+        const t = tag(ln);
+        ctx.fillStyle = ln.color;
+        ctx.beginPath(); ctx.arc(x-3, ty-3, 2.5, 0, 7); ctx.fill();
+        x -= 10;
+        ctx.fillText(t, x, ty);
+        x -= ctx.measureText(t).width + 13;
+      }
+      ctx.fillStyle=muted;
+      ctx.fillText(pnum(period), x, ty);
+    }
+    ctx.textAlign="right";
+  }
+  ctx.font='11px Vazirmatn,system-ui,sans-serif';
+
+  /* خط جداکننده بالای پنجره */
+  ctx.strokeStyle=line; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(L.x0,Math.round(top-7)+.5);
+  ctx.lineTo(L.x1,Math.round(top-7)+.5);
+  ctx.stroke();
+}
+
 function draw(){
   if(view().sheet) return;
   const L=layout(), V=view(), PL=plan();
@@ -930,12 +1503,16 @@ function draw(){
   const up=css("--up"), down=css("--down");
 
   ctx.clearRect(0,0,W,H);
+  REGIONS = [];
   ctx.textBaseline="middle";
   ctx.font='11px Vazirmatn,system-ui,sans-serif';
 
   const {keys, indexed}=PL;
   /* تا صنعت انتخاب نشده (یا فایلش نیامده) چیزی برای رسم نیست */
   if(!keys.length) return;
+  /* نمای اسیلاتورها نمودار اصلی ندارد: سری شاخص فقط ورودیِ محاسبه
+     است، کشیده نمی‌شود. */
+  const bare = !!V.multi;
 
   /* سری‌های آمادهٔ رسم */
   const plot = keys.map((k,idx)=>{
@@ -975,8 +1552,13 @@ function draw(){
   if(OV.lrc)  ovArrs.push(OV.lrc.a);
   if(OV.lrc2) ovArrs.push(OV.lrc2.a);
 
+  /* در حالت شمعی، سقف و کف هم باید در بازه جا شوند وگرنه سایه‌ها از
+     کادر می‌زنند بیرون. */
+  const candleArrs = candleOn()
+    ? [DATA.index_high, DATA.index_low].filter(Boolean) : [];
   let [lo,hi]=span(dual ? [plot[0].a, ...mas.map(m=>m.a), ...ovArrs]
-                        : [...plot.map(p=>p.a), ...mas.map(m=>m.a), ...ovArrs]);
+                        : [...plot.map(p=>p.a), ...mas.map(m=>m.a),
+                           ...ovArrs, ...candleArrs]);
   /* ستون از کفِ صفر بلند می‌شود، پس محور هم باید از صفر شروع کند —
      وگرنه بلندی ستون‌ها نسبت به هم دروغ می‌گوید. */
   if(PL.bars) lo = 0;
@@ -984,6 +1566,9 @@ function draw(){
   const [lo2,hi2] = dual ? span([plot[1].a]) : [0,1];
   const yAt2 = v => L.mainBot - (v-lo2)/(hi2-lo2)*(L.mainBot-L.mainTop);
   const yOf = idx => (dual && idx===1) ? yAt2 : yAt;
+  if(!V.multi)
+    region(L.mainTop, L.mainBot, lo, hi,
+           indexed ? 0 : plot[0].meta.dec, "");
 
   /* شبکه + برچسب محور عمودی.
      شبکه «مربعی» است: فاصلهٔ خطوط افقی و عمودی هر دو حدود CELL پیکسل،
@@ -1008,7 +1593,7 @@ function draw(){
   const dec = indexed ? 0 : plot[0].meta.dec;
   const nRows = Math.max(3, Math.round((L.mainBot-L.mainTop)/CELL));
   let widest=0;
-  for(const t of ticks(lo,hi,nRows)){
+  for(const t of (bare ? [] : ticks(lo,hi,nRows))){
     const y=Math.round(yAt(t))+.5;
     if(y<L.mainTop||y>L.mainBot) continue;
     const lab = indexed ? t.toFixed(0) : nice(t,dec);
@@ -1017,7 +1602,8 @@ function draw(){
     ctx.fillText(lab, L.x1+7, y);
   }
   /* اگر برچسب‌ها در ستون فعلی جا نمی‌شوند، ستون را پهن کن و یک بار دوباره بکش */
-  const want = Math.max(W<560?52:62, Math.ceil(widest)+12);
+  const floor = isFS() ? 46 : (W<560?52:62);
+  const want = bare ? floor : Math.max(floor, Math.ceil(widest)+12);
   if(!relaying && Math.abs(want-GUTTER)>1){
     GUTTER = want; relaying = true;
     try { draw(); } finally { relaying = false; }
@@ -1025,7 +1611,7 @@ function draw(){
   }
 
   /* خط صفر برای سری‌های دوعلامته */
-  if(!indexed && plot[0].meta.signed && lo<0 && hi>0){
+  if(!bare && !indexed && plot[0].meta.signed && lo<0 && hi>0){
     const y=Math.round(yAt(0))+.5;
     ctx.strokeStyle=css("--edge"); ctx.beginPath();
     ctx.moveTo(L.x0,y); ctx.lineTo(L.x1,y); ctx.stroke();
@@ -1060,6 +1646,8 @@ function draw(){
         ctx.fillRect(xAt(i,L)-bw/2, L.panelBot-h, bw, h);
       }
       ctx.globalAlpha=1;
+      region(L.panelTop, L.panelBot, 0, vmax,
+             (fa("value_retail")||{}).dec || 0, "");
       ctx.fillStyle=muted; ctx.textAlign="right";
       ctx.font='10px Vazirmatn,system-ui,sans-serif';
       if(W>=560) ctx.fillText("ارزش معاملات خرد", L.x1-6, L.panelTop+7);
@@ -1079,6 +1667,8 @@ function draw(){
     const padf=(fhi-flo)*0.06; flo-=padf; fhi+=padf;
     const fy = v => L.panelBot - (v-flo)/(fhi-flo)*(L.panelBot-L.panelTop);
     const zy = fy(0);
+    region(L.panelTop, L.panelBot, flo, fhi,
+           (fa("flow_retail")||{}).dec || 0, "");
 
     for(let i=state.i0;i<=state.i1;i++){
       const v=flow[i]; if(v==null) continue;
@@ -1104,41 +1694,31 @@ function draw(){
     ctx.font='11px Vazirmatn,system-ui,sans-serif';
   }
 
-  /* ---- پنل RSI ---- */
-  if(L.hasRsi){
-    const period = rsiPeriod();
-    const r = rsiOf(plot[0].a, period);
-    const ry = v => L.rsiBot - (v/100)*(L.rsiBot-L.rsiTop);
-
-    /* نوار ۳۰ تا ۷۰: جایی که هیچ سیگنالی نیست */
-    ctx.save(); ctx.globalAlpha=.05; ctx.fillStyle=css("--ink");
-    ctx.fillRect(L.x0, ry(70), L.x1-L.x0, ry(30)-ry(70)); ctx.restore();
-
-    ctx.save(); ctx.setLineDash([3,3]); ctx.strokeStyle=css("--edge"); ctx.lineWidth=1;
-    for(const lv of [30,70]){
-      const y=Math.round(ry(lv))+.5;
-      ctx.beginPath(); ctx.moveTo(L.x0,y); ctx.lineTo(L.x1,y); ctx.stroke();
+  /* ---- پنجره‌های اسیلاتور ---- */
+  if(V.multi){
+    const base = FS("index_total") || plot[0].a;
+    const drawn = [];
+    let cd = null;
+    for(const pan of (L.oscPanels || [])){
+      if(pan.id === "cnd"){
+        cd = candlePanel(L, pan.top, pan.bot, muted, line, surf, up, down);
+        continue;
+      }
+      const od = OSC.find(o=>o.id===pan.id) || OSC[0];
+      const per = oscPeriodOf(pan.id);
+      const lines = oscLinesOf(pan.id, base, per);
+      oscPanel(L, pan.top, pan.bot, od, lines, per, muted, line, surf);
+      drawn.push(...lines);
     }
-    ctx.restore();
-
-    ctx.strokeStyle=S[3]; ctx.lineWidth=1.5;
-    ctx.lineJoin="round"; ctx.lineCap="round";
-    strokeSeries(r, L, ry);
-
-    ctx.fillStyle=muted; ctx.textAlign="left";
-    ctx.font='10px Vazirmatn,system-ui,sans-serif';
-    for(const lv of [30,70]) ctx.fillText(String(lv), L.x1+7, ry(lv));
-    ctx.textAlign="right";
-    if(W>=560) ctx.fillText(`RSI ${pnum(period)}`, L.x1-6, L.rsiTop+7);
-    ctx.font='11px Vazirmatn,system-ui,sans-serif';
-
-    /* خط جداکننده بالای پنل */
-    ctx.strokeStyle=line; ctx.lineWidth=1;
-    ctx.beginPath();
-    ctx.moveTo(L.x0,Math.round(L.rsiTop-7)+.5); ctx.lineTo(L.x1,Math.round(L.rsiTop-7)+.5);
-    ctx.stroke();
-
-    window.__rsi = {a:r, period};
+    window.__candle = cd;
+    window.__rsi = drawn.length
+      ? {a:drawn[0].a, period:null, name:"اسیلاتورها", lines:drawn} : null;
+  } else if(L.hasRsi){
+    const od = oscDef(), period = rsiPeriod();
+    const lines = oscLines(plot[0].a, period);
+    oscPanel(L, L.rsiTop, L.rsiBot, od, lines, period, muted, line, surf);
+    window.__rsi = {a:(lines[0]||{}).a || new Array(FN()).fill(null),
+                    period, name:od.n, lines};
   } else window.__rsi = null;
 
   /* ---- میانگین‌های متحرک ---- */
@@ -1196,8 +1776,32 @@ function draw(){
     window.__cross = xs;
   } else { window.__cross = null; window.__crossHidden = 0; }
 
+  /* ---- شمع‌ها ----
+     بدنه از باز تا بسته، سایه از کف تا سقف. رنگ از جهتِ بدنه می‌آید.
+     وقتی بدنه نازک‌تر از یک پیکسل شود (باز و بسته برابر) یک خط افقی
+     کشیده می‌شود تا روزِ بی‌تغییر هم دیده شود. */
+  if(!bare && candleOn()){
+    const CD = candles();
+    const slotW=(L.x1-L.x0)/Math.max(1,(state.i1-state.i0+1));
+    const bw=Math.max(1, Math.min(14, slotW-1.5));
+    const thin = bw < 2.5;            // شمع‌ها که ریز شوند، فقط سایه
+    ctx.lineWidth=1;
+    for(let i=state.i0;i<=state.i1;i++){
+      const k=CD && CD[i]; if(!k) continue;
+      const x=xAt(i,L), col = k.c>=k.o ? up : down;
+      ctx.strokeStyle=col; ctx.fillStyle=col;
+      const xs=Math.round(x)+.5;
+      ctx.beginPath(); ctx.moveTo(xs, yAt(k.h)); ctx.lineTo(xs, yAt(k.l));
+      ctx.stroke();
+      if(thin) continue;
+      const y0=yAt(Math.max(k.o,k.c)), y1=yAt(Math.min(k.o,k.c));
+      ctx.fillRect(x-bw/2, y0, bw, Math.max(1, y1-y0));
+    }
+    window.__candle = CD;
+  } else if(!bare) window.__candle = null;
+
   /* ---- خطوط اصلی ---- */
-  plot.forEach((p,pi)=>{
+  if(!bare && !candleOn()) plot.forEach((p,pi)=>{
     if(PL.bars && pi===0){
       const slotW=(L.x1-L.x0)/Math.max(1,(state.i1-state.i0+1));
       const wOut=Math.max(1, slotW-2);
@@ -1289,17 +1893,51 @@ function draw(){
     }
   }
 
-  /* نشانگر متقاطع */
+  /* نشانگر متقاطع — خط عمودی روی روز، خط افقی روی خودِ نشانگر.
+     عمودی به نزدیک‌ترین روز می‌چسبد (چون داده گسسته است) ولی افقی
+     آزاد است و دقیقاً جایی می‌ایستد که موشواره هست، وگرنه نمی‌شود
+     سطحی را روی نمودار اندازه گرفت. */
   if(state.hover>=state.i0 && state.hover<=state.i1){
     const x=Math.round(xAt(state.hover,L))+.5;
     ctx.save(); ctx.setLineDash([3,3]); ctx.strokeStyle=css("--edge");
     ctx.beginPath(); ctx.moveTo(x,L.mainTop); ctx.lineTo(x,L.bottom); ctx.stroke();
     ctx.restore();
-    for(const p of plot){
+    for(const p of ((bare || candleOn()) ? [] : plot)){
       const v=p.a[state.hover]; if(v==null) continue;
       const y=yAt(v);
       ctx.fillStyle=surf; ctx.strokeStyle=p.color; ctx.lineWidth=2;
       ctx.beginPath(); ctx.arc(x,y,4,0,7); ctx.fill(); ctx.stroke();
+    }
+  }
+  if(state.hoverY != null
+     && state.hoverY >= L.mainTop-1 && state.hoverY <= L.bottom+1){
+    const hy = Math.round(state.hoverY)+.5;
+    ctx.save(); ctx.setLineDash([3,3]); ctx.strokeStyle=css("--edge");
+    ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(L.x0,hy); ctx.lineTo(L.x1,hy); ctx.stroke();
+    ctx.restore();
+    /* برچسب مقدار روی محور راست، با زمینهٔ پررنگ تا روی برچسب‌های
+       شبکه ننشیند و هر دو ناخوانا شوند. */
+    const r = regionAt(state.hoverY);
+    if(r){
+      const v = r.lo + (r.bot - state.hoverY)/(r.bot - r.top)*(r.hi - r.lo);
+      /* واحد فقط وقتی می‌آید که کوتاه باشد (٪)؛ «میلیارد تومان» در
+         برچسبِ کنار محور جا نمی‌شود و خودِ سربرگ نمودار گفته است. */
+      const txt = nice(v, r.dec) + (r.unit || "");
+      ctx.save();
+      ctx.font='10px Vazirmatn,system-ui,sans-serif';
+      const w = ctx.measureText(txt).width;
+      /* ⚠ متغیر پس‌زمینهٔ صفحه «--ground» است نه «--bg»؛ css() برای نام
+         ناموجود رشتهٔ خالی می‌دهد و fillStyle دست‌نخورده می‌ماند، یعنی
+         متنِ سیاه روی زمینهٔ سیاه. */
+      ctx.fillStyle = css("--ink");
+      roundRectPath(L.x1+3, hy-8, w+9, 16, 4); ctx.fill();
+      ctx.fillStyle = css("--ground");
+      ctx.textAlign="left"; ctx.textBaseline="middle";
+      ctx.fillText(txt, L.x1+7, hy);
+      ctx.restore();
+      ctx.font='11px Vazirmatn,system-ui,sans-serif';
+      ctx.textAlign="right";
     }
   }
 
@@ -1384,11 +2022,24 @@ function showTip(px,py){
           `<span class="n">${m.n}</span><span class="v">${niceK(v,k)}`
           + pctSince(a,i) + `</span></div>`;
   });
+  const K = window.__candle && window.__candle[i];
+  if(K){
+    const m = fa(CANDLE_KEY) || {dec:0};
+    const row = (n,v) => `<div class="r"><span class="dot" style="background:`
+      + `${v===K.c ? (K.c>=K.o?css("--up"):css("--down")) : "transparent"}`
+      + `"></span><span class="n">${n}</span>`
+      + `<span class="v">${nice(v, m.dec||0)}</span></div>`;
+    html += row("باز", K.o) + row("سقف", K.h) + row("کف", K.l)
+          + row("بسته", K.c);
+  }
+
   const R=window.__rsi;
-  if(R && R.a[i]!=null){
-    html+=`<div class="r"><span class="dot" style="background:${S[3]}"></span>`+
-          `<span class="n">RSI ${pnum(R.period)}</span>`+
-          `<span class="v">${R.a[i].toFixed(1)}</span></div>`;
+  for(const ln of (R && R.lines) || []){
+    if(ln.a[i]==null) continue;
+    html+=`<div class="r"><span class="dot" style="background:${ln.color}"></span>`+
+          `<span class="n">${ln.tn||ln.n}</span>`+
+          `<span class="v">${ln.a[i].toFixed(ln.dec==null?1:ln.dec)}`
+          + `${ln.unit||""}</span></div>`;
   }
   for(const m of (window.__mas||[])){
     if(m.a[i]==null) continue;
@@ -1478,16 +2129,21 @@ stage.addEventListener("pointermove",e=>{
   if(drag){
     const bars=(e.offsetX-drag.x)/(L.x1-L.x0)*(drag.i1-drag.i0);
     state.i0=drag.i0+bars; state.i1=drag.i1+bars;
+    state.hoverY=null;              // در حال جابه‌جایی، نشانگر معنی ندارد
     clampView(); draw(); return;
   }
   const i=Math.round(iAt(e.offsetX,L));
   state.hover=(i>=state.i0&&i<=state.i1)?i:-1;
+  state.hoverY=e.offsetY;
   draw(); showTip(e.offsetX,e.offsetY);
 });
 const endDrag=()=>{ drag=null; };
 stage.addEventListener("pointerup",endDrag);
 stage.addEventListener("pointercancel",endDrag);
-stage.addEventListener("pointerleave",()=>{ drag=null; state.hover=-1; tip.style.opacity=0; draw(); });
+stage.addEventListener("pointerleave",()=>{
+  drag=null; state.hover=-1; state.hoverY=null;
+  tip.style.opacity=0; draw();
+});
 stage.addEventListener("wheel",e=>{
   e.preventDefault();
   const L=layout(), anchor=iAt(e.offsetX,L);
@@ -1571,7 +2227,7 @@ function setView(id){
   viewsRow.querySelectorAll("button").forEach(b=>
     b.setAttribute("aria-pressed", b.dataset.v===id?"true":"false"));
   if(isSheet){
-    syncChips(); syncMaRow(); syncRsiRow(); syncOvRow();
+    syncChips(); syncMaRow(); syncRsiRow(); syncOvRow(); syncMultiRow(); syncCandleBtn();
     if(isFlow){ ensureFlow(); return; }  // ensureFlow خودش پنل را می‌سازد
     if(V.ind){ ensureInd(); return; }   // ensureInd خودش جدول را می‌سازد
     renderSheet();
@@ -1586,7 +2242,7 @@ function setView(id){
   }
   applyRange(V.free?0:250);
   markRange(V.free?5:3);
-  syncChips(); syncMaRow(); syncRsiRow(); syncOvRow(); draw();
+  syncChips(); syncMaRow(); syncRsiRow(); syncOvRow(); syncMultiRow(); syncCandleBtn(); draw();
 }
 
 document.getElementById("cmp").addEventListener("click",e=>{
@@ -1595,7 +2251,9 @@ document.getElementById("cmp").addEventListener("click",e=>{
     state.compare=[state.key, state.key==="index_total"?"index_ew":"index_total"];
   }
   e.currentTarget.setAttribute("aria-pressed", state.cmpMode?"true":"false");
-  syncChips(); draw();
+  /* حالت مقایسه دو سری را روی پایهٔ ۱۰۰ می‌برد و شمع آن‌جا بی‌معنی
+     است؛ کلیدش باید همان‌جا پنهان شود، نه اینکه بماند و کار نکند. */
+  syncChips(); syncCandleBtn(); draw();
 });
 
 const legendRow=document.getElementById("legend");
@@ -1657,8 +2315,8 @@ function syncChips(){
     const mainKey = V.resample ? ratioKey() : (P.keys[0] || V.key || "");
     /* در حالت ستونی سری اصلی خط نیست؛ خودش پایین‌تر به‌شکل ستون معرفی
        می‌شود و این‌جا فقط دو بار یک نام می‌شد. */
-    if(!P.bars) items.push([S[0], fullName(mainKey), "line"]);
-    maPeriods().forEach((p,j)=>items.push([S[(j+1)%3], maName(p), "line"]));
+    if(!P.bars && !V.multi) items.push([S[0], fullName(mainKey), "line"]);
+    maList().forEach((p,j)=>items.push([S[(j+1)%3], maName(p), "line"]));
   }
   if(P.bars){
     /* نام از خودِ سری خوانده می‌شود، پس در تب صنایع می‌نویسد «ارزش
@@ -1715,10 +2373,34 @@ const ROW_H = 27;
 /* جدول دو ارباب دارد: تب «جدول» که همهٔ سری‌های بازار را می‌دهد و تب
    «صنایع» که سیزده ستونِ یک صنعت را. پس ستون‌ها و ردیف‌ها تابع‌اند نه
    ثابت، و سرستون هر بار از نو نوشته می‌شود. */
+/* ستون‌های محاسباتیِ RMF — سری ذخیره‌شده نیستند، از ورود پول و ارزش
+   معاملاتِ همان ستون‌ها ساخته می‌شوند. سه افق: پنج‌روزه (موج)،
+   بیست‌ودو‌روزه (ماه معاملاتی) و شصت‌وشش‌روزه (فصل).
+
+   ⚠ در تب صنایع جفتِ خودِ همان صنعت به کار می‌رود، نه جریان کل بازار —
+     همان قاعده‌ای که در نمودار هم هست. */
+const RMF_SPANS = [5, 22, 66];
+function rmfCols(pair, tag){
+  if(!pair) return [];
+  return RMF_SPANS.map(p => ({
+    k: `rmf${p}@${tag}`, n: `RMF-${pnum(p)}`, u: "درصد", dec: 1, signed: true,
+    calc: () => cached(`rmfcol|${tag}|${p}`, () => rmfOf(p, pair)),
+  }));
+}
+function marketPair(){
+  return (DATA.flow_retail && DATA.value_retail)
+    ? {f:DATA.flow_retail, v:DATA.value_retail, id:"mkt"} : null;
+}
+function indPair(code){
+  const f = DATA[indKey(code,"flow")], v = DATA[indKey(code,"value")];
+  return (f && v) ? {f, v, id:"ind"+code} : null;
+}
+
 function curCols(){
   const V = view();
-  if(V.ind) return indCols();
-  return SHEET_COLS;
+  if(V.ind) return indCols().concat(
+    state.ind ? rmfCols(indPair(state.ind), "ind"+state.ind) : []);
+  return SHEET_COLS.concat(rmfCols(marketPair(), "mkt"));
 }
 function curRows(){
   const V = view();
@@ -1752,8 +2434,12 @@ function renderSheet(){
   for(let r=first;r<last;r++){
     const i = rows[r];
     html += `<tr><td>${jDate(DATA.d[i])}</td>` + cols.map(c=>{
-      const a = DATA[c.k], v = a ? a[i] : null;
-      return v==null ? '<td class="none">—</td>' : `<td>${nice(v, c.dec)}</td>`;
+      const a = c.calc ? c.calc() : DATA[c.k], v = a ? a[i] : null;
+      if(v==null) return '<td class="none">—</td>';
+      /* ستون‌های علامت‌دار رنگ می‌گیرند تا ورود و خروج پول در یک نگاه
+         از هم جدا شوند — سه ستون RMF وگرنه دریایی از عدد می‌شوند. */
+      const cls = c.signed ? (v>0 ? ' class="pos"' : v<0 ? ' class="neg"' : "") : "";
+      return `<td${cls}>${nice(v, c.dec)}</td>`;
     }).join("") + "</tr>";
   }
   const restRows = rows.length - last;
@@ -1790,7 +2476,8 @@ function buildCsv(){
   for(let r=rows.length-1;r>=0;r--){
     const i = rows[r];
     lines.push([DATA.d[i], ...cols.map(c=>{
-      const a=DATA[c.k], v=a?a[i]:null; return v==null ? "" : v;
+      const a=c.calc?c.calc():DATA[c.k], v=a?a[i]:null;
+      return v==null ? "" : (c.dec!=null ? +v.toFixed(c.dec) : v);
     })].join(","));
   }
   return "\uFEFF" + lines.join("\n");
@@ -1824,6 +2511,8 @@ csvBtn.addEventListener("click", async ()=>{
 
 /* ================= میانگین‌های متحرک دلخواه ================= */
 const maRow   = document.getElementById("maRow");
+const maBtn   = document.getElementById("maBtn");
+const maDot   = document.getElementById("maDot");
 const maInput = document.getElementById("maInput");
 const maKindRow = document.getElementById("maKind");
 const maSwatches = document.getElementById("maSwatches");
@@ -1853,11 +2542,19 @@ function norm(t){
 
 function syncMaRow(){
   const V=view();
-  if(V.sheet){ maRow.hidden=true; return; }
+  if(V.sheet || V.multi){ maRow.hidden=true; return; }
   rsiBtn.hidden = false;
   const indexed = state.cmpMode && state.compare.length>1 && V.free;
   maRow.hidden = indexed;
   if(indexed) return;
+
+  const on = maOn();
+  maBtn.setAttribute("aria-pressed", on?"true":"false");
+  maDot.style.background = on ? PAL()[1] : "var(--edge)";
+  /* خاموش که باشد، نوعِ میانگین و کادر دوره‌ها و نمونه‌رنگ‌ها جایی
+     ندارند — کلیدی که کار نمی‌کند بدتر از نبودنش است. */
+  maKindRow.hidden = maInput.hidden = maSwatches.hidden = !on;
+  if(!on){ maSwatches.innerHTML = ""; return; }
 
   const ps = maPeriods();
   if(document.activeElement !== maInput) maInput.value = pnumList(ps);
@@ -1870,6 +2567,11 @@ function syncMaRow(){
   maSwatches.innerHTML = ps.slice(0,MAX_MA).map((p,j)=>
     `<span class="it"><i style="background:${S[(j+1)%S.length]}"></i>${pnum(p)}</span>`).join("");
 }
+maBtn.addEventListener("click", ()=>{
+  const k = maKey();
+  state.maOff[k] = !state.maOff[k];
+  syncMaRow(); syncChips(); draw();
+});
 
 function applyPeriods(){
   /* کادر خالی یعنی «برگرد به پیش‌فرض همین نما»، نه «هیچ میانگینی» —
@@ -1886,33 +2588,139 @@ maKindRow.addEventListener("click", e=>{
   state.maKind=b.dataset.k; syncMaRow(); syncChips(); draw();
 });
 
-/* ================= RSI ================= */
+/* ================= کلید خطی / شمعی ================= */
+const candleBtn = document.getElementById("candleBtn");
+const candleDot = document.getElementById("candleDot");
+
+function syncCandleBtn(){
+  /* فقط جایی دیده می‌شود که واقعاً شمع داریم: شاخص کل، قاب روزانه،
+     یک سری (نه حالت مقایسه). جای دیگر نبودنش بهتر از خاکستری‌بودنش است. */
+  /* در نمای اسیلاتورها شمع چیپ خودش را دارد («کندل شاخص»)؛ دو کلید
+     برای یک کار فقط گیج می‌کند. */
+  const ok = !view().sheet && !view().multi && candleReady();
+  candleBtn.hidden = !ok;
+  if(!ok) return;
+  const on = candleOn();
+  candleBtn.setAttribute("aria-pressed", on?"true":"false");
+  candleDot.style.background = on ? css("--s1") : "var(--edge)";
+}
+candleBtn.addEventListener("click", ()=>{
+  state.candle[state.view] = !state.candle[state.view];
+  syncCandleBtn(); draw();
+});
+
+/* ================= اسیلاتور پنل پایین ================= */
 const rsiBtn = document.getElementById("rsiBtn");
 const rsiInput = document.getElementById("rsiInput");
 const rsiDot = document.getElementById("rsiDot");
-const RSI_DEFAULT = 14;
+const rsiLabel = document.getElementById("rsiLabel");
+const oscKind = document.getElementById("oscKind");
+/* دورهٔ پیش‌فرض هر اسیلاتور از خودِ OSC می‌آید */
+
+for(const o of OSC){
+  const el=document.createElement("option");
+  el.value=o.id; el.textContent=o.sn || o.fn || o.n;
+  oscKind.appendChild(el);
+}
 
 function syncRsiRow(){
+  /* RMF جریان پول حقیقیِ بازار را می‌خواهد. روی طلا و دلار و قاب
+     هفتگی چیزی برای نشان دادن ندارد، پس خودش به RSI برمی‌گردد — نه
+     این‌که خط صاف نشان بدهد. */
+  if(!oscUsable(state.osc)) state.osc = OSC_DEFAULT;
+  /* نمای شاخص کل نوار خودش را دارد؛ دو نوار با هم فقط گیج می‌کند. */
+  const solo = !view().multi;
+  rsiBtn.hidden = !solo;
   const p = rsiPeriod();
-  const on = p != null;
+  const on = solo && p != null;
+  rsiLabel.textContent = oscDef().n;
   rsiBtn.setAttribute("aria-pressed", on?"true":"false");
-  rsiDot.style.background = on ? PAL()[3] : "var(--edge)";
+  rsiDot.style.background = on ? css("--s4") : "var(--edge)";
   rsiInput.hidden = !on;
+  oscKind.hidden = !solo;         // کشویی جز در نمای چندتایی همیشه پیداست
+  oscKind.value = state.osc;
+  for(const op of oscKind.options){
+    const bad = !oscUsable(op.value);
+    op.disabled = bad;
+    const d = OSC.find(o=>o.id===op.value) || {};
+    op.textContent = (d.sn || d.fn || d.n)
+      + (bad ? " — جریان پول ندارد" : "");
+  }
   if(on && document.activeElement !== rsiInput) rsiInput.value = pnum(p);
 }
 rsiBtn.addEventListener("click", ()=>{
-  state.rsi[state.view] = rsiPeriod()==null ? RSI_DEFAULT : null;
+  state.rsi[state.view] = !state.rsi[state.view];
+  syncRsiRow(); draw();
+});
+oscKind.addEventListener("change", ()=>{
+  state.osc = oscKind.value;
+  state.rsi[state.view] = true;   // انتخاب از کشویی یعنی «نشانش بده»
   syncRsiRow(); draw();
 });
 function applyRsi(){
   const n = readPeriods(rsiInput.value)[0];
-  state.rsi[state.view] = n || RSI_DEFAULT;
+  state.oscP[state.osc] = n || oscDef().def;
   syncRsiRow(); draw();
 }
 rsiInput.addEventListener("change", applyRsi);
 rsiInput.addEventListener("blur", applyRsi);
 rsiInput.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); rsiInput.blur(); }});
 
+/* ============ نوار چنداسیلاتوره (فقط نمای شاخص کل) ============ */
+const multiRow = document.getElementById("multiRow");
+/* ترتیبشان همان ترتیب پنجره‌هاست: شمع بالا، بعد RSI و RMF و ویلیامز.
+   شمع دوره ندارد، پس inp ندارد. */
+const M_CHIPS = [
+  {id:"cnd", btn:"mCndBtn", dot:"mCndDot", inp:null,   c:"--s1"},
+  {id:"rsi", btn:"mRsiBtn", dot:"mRsiDot", inp:"mRsiP", c:"--s4"},
+  {id:"rmf", btn:"mRmfBtn", dot:"mRmfDot", inp:"mRmfP", c:"--s7"},
+  {id:"wr",  btn:"mWrBtn",  dot:"mWrDot",  inp:"mWrP",  c:"--s4"},
+];
+
+function syncMultiRow(){
+  const V = view();
+  const on = !!V.multi;
+  multiRow.hidden = !on;
+  if(!on) return;
+  for(const c of M_CHIPS){
+    const b = document.getElementById(c.btn);
+    const d = document.getElementById(c.dot);
+    const i = c.inp ? document.getElementById(c.inp) : null;
+    /* RMF بدون جریان پول چیزی ندارد و شمع بدون سقف و کف؛ خاموش و
+       خاکستری می‌مانند و کنارشان می‌نویسد چرا، نه این‌که خط صاف بکشند. */
+    const usable = panelUsable(c.id);
+    b.disabled = !usable;
+    b.style.opacity = usable ? "" : ".45";
+    b.title = usable ? ""
+      : (c.id==="cnd" ? "سقف و کف این سری را نداریم"
+                      : "برای این سری جریان پول نداریم");
+    const act = usable && !!state.oscOn[c.id];
+    b.setAttribute("aria-pressed", act?"true":"false");
+    d.style.background = act ? css(c.c) : "var(--edge)";
+    if(!i) continue;
+    i.hidden = !act;
+    const def = (OSC.find(o=>o.id===c.id)||{}).def || 14;
+    if(act && document.activeElement !== i)
+      i.value = pnum(state.oscP[c.id] || def);
+  }
+}
+for(const c of M_CHIPS){
+  document.getElementById(c.btn).addEventListener("click", ()=>{
+    state.oscOn[c.id] = !state.oscOn[c.id];
+    syncMultiRow(); draw();
+  });
+  if(!c.inp) continue;
+  const i = document.getElementById(c.inp);
+  const apply = ()=>{
+    const n = readPeriods(i.value)[0];
+    state.oscP[c.id] = n || (OSC.find(o=>o.id===c.id)||{}).def || 14;
+    syncMultiRow(); draw();
+  };
+  i.addEventListener("change", apply);
+  i.addEventListener("blur", apply);
+  i.addEventListener("keydown", e=>{
+    if(e.key==="Enter"){ e.preventDefault(); i.blur(); }});
+}
 /* ================= نوار اندیکاتورها ================= */
 const ovRow      = document.getElementById("ovRow");
 const vwapBtn    = document.getElementById("vwapBtn");
@@ -1946,7 +2754,7 @@ LRC_WINS.forEach(w=>{
 
 function syncOvRow(){
   const V=view();
-  if(V.sheet){ ovRow.hidden=true; return; }
+  if(V.sheet || V.multi){ ovRow.hidden=true; return; }
   const indexed = state.cmpMode && state.compare.length>1 && V.free;
   ovRow.hidden = indexed;
   if(indexed) return;
@@ -2033,6 +2841,7 @@ document.addEventListener("fullscreenchange", ()=>{
   const on = !!document.fullscreenElement;
   fsBtn.textContent = on ? "خروج از تمام‌صفحه" : "تمام‌صفحه";
   fsBtn.setAttribute("aria-pressed", on?"true":"false");
+  GUTTER = on ? 46 : 62;        // از نو اندازه گرفته می‌شود
   requestAnimationFrame(resize);
 });
 document.addEventListener("keydown", e=>{
@@ -2174,7 +2983,7 @@ SERIES.filter(s=>!s.hide && DATA[s.k]).forEach(s=>{
 });
 serPick.addEventListener("change", ()=>{
   state.key = serPick.value; state.compare=[state.key];
-  syncChips(); syncMaRow(); syncRsiRow(); syncOvRow(); draw();
+  syncChips(); syncMaRow(); syncRsiRow(); syncOvRow(); syncMultiRow(); syncCandleBtn(); draw();
 });
 
 /* ---- کلیدهای روزانه/هفتگی/ماهانه در تب نسبت نقدینگی ---- */
@@ -2190,7 +2999,7 @@ RATIO_STEPS.forEach(s=>{
        می‌ماندند و تاریخِ ردیفِ ناموجود خوانده می‌شد. */
     const on = rangeRow.querySelector('button[aria-pressed="true"]');
     applyRange(on ? +on.dataset.d : 0);
-    syncChips(); syncMaRow(); syncRsiRow(); syncOvRow(); draw();
+    syncChips(); syncMaRow(); syncRsiRow(); syncOvRow(); syncMultiRow(); syncCandleBtn(); draw();
   });
   stepRow.appendChild(b);
 });
@@ -2349,7 +3158,7 @@ function applyIndChart(){
      چند ماه داده دارد، applyRange خودش تا آخرین روزِ دارای داده عقب
      می‌آید. */
   applyRange(250); markRange(3);
-  syncChips(); syncMaRow(); syncRsiRow(); syncOvRow(); draw();
+  syncChips(); syncMaRow(); syncRsiRow(); syncOvRow(); syncMultiRow(); syncCandleBtn(); draw();
 }
 
 function ensureIndChart(){
@@ -2364,7 +3173,11 @@ function ensureIndChart(){
 /* قالب وب کل این فایل را داخل یک تابع می‌پیچد، پس از کنسول مرورگر (و از
    تست‌های خودکار) هیچ‌کدام از این‌ها دیده نمی‌شد. چیز تازه‌ای لو نمی‌دهد —
    همهٔ داده‌اش همان data.json کنار صفحه است. */
-window.__dbg = {state, DATA, FRAMES, plan, view, fa, frame, IND};
+window.__dbg = {state, DATA, FRAMES, plan, view, fa, frame, IND,
+                OSC, oscDef, oscLines, oscUsable, flowUsable,
+                rmfOf, willrOf, flowPair, rsiPeriod,
+                accumLevels, oscLinesOf, oscPeriodOf, multiOn,
+                candles, candleOn, candleReady};
 
 /* ---------- راه‌اندازی ---------- */
 new ResizeObserver(resize).observe(stage);
@@ -2376,6 +3189,8 @@ state.compare=[state.key];
 syncChips();
 syncMaRow();
 syncRsiRow();
+syncMultiRow();
+syncCandleBtn();
 syncOvRow();
 resize();
 
@@ -2471,6 +3286,35 @@ function sumInd(code, i0, i1){
   return {s: n ? s : null, n};
 }
 
+/* RMF-۵ یک صنعت در «آخرین روزِ بازه» و دو روز معاملاتیِ پیش از آن.
+
+   ⚠ «روز قبل» یعنی روز معاملاتیِ قبلیِ *همین صنعت*، نه روز تقویمی و نه
+     روز بازار: صنعتی که چهارشنبه داده ندارد، روز قبلش سه‌شنبه است.
+     ردیف‌ها در flow.json تُنُک‌اند و همین را طبیعی می‌کند.
+
+   خروجی: [{v, d}] از تازه به قدیم — v مقدار RMF و d تاریخ همان روز.
+   جایی که پنجرهٔ پنج‌روزه کامل نباشد یا مخرج صفر باشد، null. */
+const FLOW_RMF_BACK = 3;
+function indRmfAt(code, i1, span){
+  const o = FLOW && FLOW[code];
+  const out = [];
+  if(!o || !o.v) return out;
+  /* آخرین ردیفی که داخل بازه است */
+  let last = -1;
+  for(let p=0;p<o.i.length;p++){ if(o.i[p] <= i1) last = p; else break; }
+  for(let k=0;k<FLOW_RMF_BACK;k++){
+    const p = last - k;
+    if(p < span-1){ out.push({v:null, d:null}); continue; }
+    let sf = 0, sv = 0, ok = true;
+    for(let q=p-span+1;q<=p;q++){
+      if(o.f[q]==null || o.v[q]==null){ ok = false; break; }
+      sf += o.f[q]; sv += o.v[q];
+    }
+    out.push({v: (ok && sv) ? sf/sv*100 : null, d: DATA.d[o.i[p]]});
+  }
+  return out;
+}
+
 const flowSign = v => v==null ? "" : (v > 0 ? "pos" : (v < 0 ? "neg" : ""));
 
 function flowBig(v){
@@ -2531,8 +3375,9 @@ function renderFlow(){
     + "نه سهمی از کل بازار. سه بخش مستقل‌اند و جمعشان روی هم معنی ندارد.";
 
   const all = IND.codes.map(c => {
-    const {s, n} = sumInd(String(c.c), i0, i1);
-    return {c:String(c.c), n:c.n, s, days:n};
+    const code = String(c.c);
+    const {s, n} = sumInd(code, i0, i1);
+    return {c:code, n:c.n, s, days:n, rmf:indRmfAt(code, i1, 5)};
   }).filter(r => r.s != null);
 
   flowTables.innerHTML =
@@ -2563,7 +3408,14 @@ function flowTable(title, rows, full){
       <td class="bar"><div class="bar-wrap"><span class="zero" style="inset-inline-start:50%"></span><i style="${side}"></i></div></td>
       <td class="${short ? "none" : ""}"${short
         ? ` title="فقط ${fmt(r.days,0)} روز از ${fmt(full,0)} روزِ بازه داده دارد."` : ""
-        }>${fmt(r.days,0)}</td></tr>`;
+        }>${fmt(r.days,0)}</td>`
+      + (r.rmf.length ? r.rmf : [{v:null},{v:null},{v:null}]).map(x =>
+          x.v==null
+            ? '<td class="none">—</td>'
+            : `<td class="rmf ${flowSign(x.v)}"${x.d
+                ? ` title="${jDate(x.d)}"` : ""}>${nice(x.v,1)}</td>`
+        ).join("")
+      + `</tr>`;
   }).join("");
   return `<div class="flow-head">${title}<span>${fmt(rows.length,0)} ردیف</span></div>`
     + `<table><thead><tr>
@@ -2571,6 +3423,9 @@ function flowTable(title, rows, full){
         <th>مجموع ورود پول حقیقی<span class="unit">میلیارد تومان</span></th>
         <th>اندازه نسبت به بزرگ‌ترینِ همین بخش</th>
         <th>روز داده<span class="unit">از ${fmt(full,0)} روز بازه</span></th>
+        <th class="rmf">RMF-۵<span class="unit">روز آخرِ بازه</span></th>
+        <th class="rmf">RMF-۵<span class="unit">یک روز قبل</span></th>
+        <th class="rmf">RMF-۵<span class="unit">دو روز قبل</span></th>
       </tr></thead><tbody>${body}</tbody></table>`;
 }
 
@@ -2598,16 +3453,25 @@ flowCsvBtn.addEventListener("click", () => {
   const R = flowRange();
   if(!R.ok) return;
   const {i0, i1} = R;
-  const lines = ["بخش,نام,مجموع ورود پول حقیقی (میلیارد تومان),روز داده"];
+  const lines = ["بخش,نام,مجموع ورود پول حقیقی (میلیارد تومان),روز داده,"
+                 + "RMF-5 روز آخر,تاریخ,RMF-5 یک روز قبل,تاریخ,"
+                 + "RMF-5 دو روز قبل,تاریخ"];
   for(const m of FLOW_MARKET){
     const {s, n} = sumSeries(DATA[m.k], i0, i1);
-    lines.push(`کل بازار,${m.n},${s==null?"":s.toFixed(1)},${n}`);
+    lines.push(`کل بازار,${m.n},${s==null?"":s.toFixed(1)},${n},,,,,,`);
   }
   if(flowState === "ready"){
     for(const c of IND.codes){
-      const {s, n} = sumInd(String(c.c), i0, i1);
+      const code = String(c.c);
+      const {s, n} = sumInd(code, i0, i1);
       if(s == null) continue;
-      lines.push(`${isFundCode(c.c) ? "صندوق‌ها" : "صنایع"},${c.n},${s.toFixed(1)},${n}`);
+      const rm = indRmfAt(code, i1, 5);
+      const tail = [0,1,2].map(k => {
+        const x = rm[k];
+        return `${x && x.v!=null ? x.v.toFixed(1) : ""},${x && x.d ? x.d : ""}`;
+      }).join(",");
+      lines.push(`${isFundCode(c.c) ? "صندوق‌ها" : "صنایع"},${c.n},`
+                 + `${s.toFixed(1)},${n},${tail}`);
     }
   }
   saveCsv(`bourse_flow_${DATA.d[i0]}_${DATA.d[i1]}.csv`, "﻿" + lines.join("\n"));
