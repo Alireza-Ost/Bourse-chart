@@ -1,10 +1,16 @@
-# آزمونِ یک‌بارهٔ دسترسی — نه برداشتی، نه نوشتنی در مخزن.
+# آزمونِ دسترسی — نه برداشتی، نه نوشتنی در مخزن.
 #
 # تنها سؤال: آیا رانرِ گیت‌هاب به منابع داده راه دارد؟ اگر نه، کل نقشهٔ
 # «سایت خودش را به‌روز کند» روی گیت‌هاب اکشنز شدنی نیست و باید سراغ
 # زمان‌بندِ ویندوز رفت.
 #
-# اجرا: تب Actions → Reachability test → Run workflow
+# ── چرا این شکلی نوشته شده
+#   خواندنِ لاگِ اکشنز ورود به حساب می‌خواهد («Sign in to view logs»)،
+#   پس نتیجه در دو جای *عمومی* هم گذاشته می‌شود که بدون لاگین دیده شود:
+#     ۱. Job summary — جدولِ پایینِ صفحهٔ Summary همان ران
+#     ۲. Annotations — کادرِ اعلان‌های بالای همان صفحه
+#   به همین دلیل هیچ مرحله‌ای عمداً fail نمی‌شود؛ وضعیتِ سبز یعنی آزمون
+#   اجرا شد، نه این‌که منبع در دسترس بود. جدول را بخوانید.
 name: Reachability test
 
 on:
@@ -20,46 +26,81 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: کجا ایستاده‌ایم
-        run: |
-          echo "IP خروجی و کشورش:"
-          curl -s --max-time 20 https://ipinfo.io/json || echo "  (ipinfo در دسترس نبود)"
-
-      - name: آزمون هر منبع
+      - name: probe every source
         run: |
           UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36'
+
+          geo=$(curl -s --max-time 20 https://ipinfo.io/json \
+                | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("country","?"), d.get("org","?")[:40])' \
+                2>/dev/null || echo '? ?')
+          echo "::notice title=runner::egress $geo"
+
+          {
+            echo "## آزمون دسترسیِ رانر گیت‌هاب"
+            echo
+            echo "خروجیِ شبکه: \`$geo\`"
+            echo
+            echo "| منبع | وضعیت | HTTP | حجم | ثانیه |"
+            echo "|---|---|---:|---:|---:|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
           probe () {
             name="$1"; url="$2"
-            out=$(curl -sS -o /tmp/body -D /tmp/hdr --max-time 30 -A "$UA" \
-                       -w '%{http_code} %{size_download} %{time_total}' "$url" 2>/tmp/err) \
-              && printf '  OK   %-22s HTTP %s · %s bytes · %s s\n' "$name" $out \
-              || printf '  FAIL %-22s %s\n' "$name" "$(head -c 160 /tmp/err)"
+            if out=$(curl -sS -o /tmp/body --max-time 30 -A "$UA" \
+                          -w '%{http_code} %{size_download} %{time_total}' "$url" 2>/tmp/err); then
+              set -- $out
+              code=$1; size=$2; secs=$3
+              # حجمِ ناچیز یا کدِ غیر ۲۰۰ یعنی دیوار، نه داده
+              if [ "$code" = 200 ] && [ "$size" -gt 500 ]; then
+                mark='OK'
+              else
+                mark='EMPTY'
+              fi
+              echo "| $name | $mark | $code | $size | $secs |" >> "$GITHUB_STEP_SUMMARY"
+              echo "::notice title=$name::$mark HTTP $code · $size bytes · ${secs}s"
+            else
+              err=$(head -c 120 /tmp/err | tr '\n' ' ')
+              echo "| $name | FAIL | – | – | – |" >> "$GITHUB_STEP_SUMMARY"
+              echo "::error title=$name::FAIL $err"
+            fi
           }
-          echo "نتیجه:"
+
           probe "candles"      'https://tradersarena.ir/data/000/prices?timeframe=0'
           probe "market-hist"  'https://tradersarena.ir/market/history?type=1'
           probe "market0"      'https://tradersarena.ir/data/market0'
           probe "industries"   'https://tradersarena.ir/data/industries-csv'
           probe "ind-history"  'https://tradersarena.ir/industries/27/history'
           probe "chartix"      'https://market.chartix.ir/symbol/history?ticker=BRS00IRMCAP&tf=1D'
-          probe "parsis(tg)"   'https://t.me/s/parsistahlil'
+          probe "parsis-tg"    'https://t.me/s/parsistahlil'
 
-      - name: آیا پاسخ واقعی است یا صفحهٔ مسدودی
+      - name: is the answer real data or a wall
         run: |
           UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36'
           curl -sS --max-time 30 -A "$UA" \
             'https://tradersarena.ir/data/000/prices?timeframe=0' -o /tmp/p.json || true
           python3 - <<'PY'
-          import json, pathlib
-          b = pathlib.Path('/tmp/p.json')
-          if not b.exists() or not b.stat().st_size:
-              print("  no response at all."); raise SystemExit(0)
-          print("  response size:", f"{b.stat().st_size:,}", "bytes")
-          try:
-              d = json.loads(b.read_text())
-              c = d.get('candles') or []
-              print(f"  OK  valid JSON - {len(c)} candles, last {c[-1][6] if c else '-'}")
-          except Exception as e:
-              print("  FAIL  not JSON (blocked page or captcha?):", type(e).__name__)
-              print("  first 100 bytes:", b.read_bytes()[:100])
+          import json, os, pathlib
+
+          body = pathlib.Path('/tmp/p.json')
+          out = ["", "### آیا پاسخ، دادهٔ واقعی است؟", ""]
+
+          if not body.exists() or not body.stat().st_size:
+              out.append("**هیچ پاسخی نیامد.**")
+              kind, verdict = "error", "no response at all"
+          else:
+              out.append(f"حجم پاسخ: {body.stat().st_size:,} بایت")
+              out.append("")
+              try:
+                  candles = json.loads(body.read_text()).get("candles") or []
+                  last = candles[-1][6] if candles else "-"
+                  out.append(f"**JSON سالم — {len(candles)} کندل، آخرین {last}**")
+                  kind, verdict = "notice", f"valid JSON, {len(candles)} candles, last {last}"
+              except Exception as exc:
+                  out += [f"**JSON نیست ({type(exc).__name__}) — صفحهٔ مسدودی یا کپچا**",
+                          "", "```", repr(body.read_bytes()[:120]), "```"]
+                  kind, verdict = "error", f"not JSON: {type(exc).__name__}"
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+              fh.write("\n".join(out) + "\n")
+          print(f"::{kind} title=verdict::{verdict}")
           PY
