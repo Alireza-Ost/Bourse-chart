@@ -8,7 +8,13 @@
 name: Reachability test
 
 on:
-  workflow_dispatch:        # فقط دستی؛ هیچ زمان‌بندی ندارد
+  workflow_dispatch:        # دکمهٔ دستی در تب Actions
+  # و خودکار، هر بار که همین فایل عوض شود. این‌طور لازم نیست دنبال
+  # دکمه بگردید: یک پوش کافی است. چون paths فقط خودِ این فایل است،
+  # پوش‌های روزانهٔ داده اجرایش نمی‌کنند.
+  push:
+    paths:
+      - '.github/workflows/reachability.yml'
 
 jobs:
   probe:
