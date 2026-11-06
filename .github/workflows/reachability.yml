@@ -1,0 +1,59 @@
+# آزمونِ یک‌بارهٔ دسترسی — نه برداشتی، نه نوشتنی در مخزن.
+#
+# تنها سؤال: آیا رانرِ گیت‌هاب به منابع داده راه دارد؟ اگر نه، کل نقشهٔ
+# «سایت خودش را به‌روز کند» روی گیت‌هاب اکشنز شدنی نیست و باید سراغ
+# زمان‌بندِ ویندوز رفت.
+#
+# اجرا: تب Actions → Reachability test → Run workflow
+name: Reachability test
+
+on:
+  workflow_dispatch:        # فقط دستی؛ هیچ زمان‌بندی ندارد
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: کجا ایستاده‌ایم
+        run: |
+          echo "IP خروجی و کشورش:"
+          curl -s --max-time 20 https://ipinfo.io/json || echo "  (ipinfo در دسترس نبود)"
+
+      - name: آزمون هر منبع
+        run: |
+          UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36'
+          probe () {
+            name="$1"; url="$2"
+            out=$(curl -sS -o /tmp/body -D /tmp/hdr --max-time 30 -A "$UA" \
+                       -w '%{http_code} %{size_download} %{time_total}' "$url" 2>/tmp/err) \
+              && printf '  OK   %-22s HTTP %s · %s bytes · %s s\n' "$name" $out \
+              || printf '  FAIL %-22s %s\n' "$name" "$(head -c 160 /tmp/err)"
+          }
+          echo "نتیجه:"
+          probe "candles"      'https://tradersarena.ir/data/000/prices?timeframe=0'
+          probe "market-hist"  'https://tradersarena.ir/market/history?type=1'
+          probe "market0"      'https://tradersarena.ir/data/market0'
+          probe "industries"   'https://tradersarena.ir/data/industries-csv'
+          probe "ind-history"  'https://tradersarena.ir/industries/27/history'
+          probe "chartix"      'https://market.chartix.ir/symbol/history?ticker=BRS00IRMCAP&tf=1D'
+          probe "parsis(tg)"   'https://t.me/s/parsistahlil'
+
+      - name: آیا پاسخ واقعی است یا صفحهٔ مسدودی
+        run: |
+          UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36'
+          curl -sS --max-time 30 -A "$UA" \
+            'https://tradersarena.ir/data/000/prices?timeframe=0' -o /tmp/p.json || true
+          python3 - <<'PY'
+          import json, pathlib
+          b = pathlib.Path('/tmp/p.json')
+          if not b.exists() or not b.stat().st_size:
+              print("  no response at all."); raise SystemExit(0)
+          print("  response size:", f"{b.stat().st_size:,}", "bytes")
+          try:
+              d = json.loads(b.read_text())
+              c = d.get('candles') or []
+              print(f"  OK  valid JSON - {len(c)} candles, last {c[-1][6] if c else '-'}")
+          except Exception as e:
+              print("  FAIL  not JSON (blocked page or captcha?):", type(e).__name__)
+              print("  first 100 bytes:", b.read_bytes()[:100])
+          PY
