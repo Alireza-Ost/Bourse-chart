@@ -201,11 +201,13 @@ button{font:inherit;color:inherit}
   border-top:1px solid var(--line); margin-top:4px;
 }
 .flow-head span{font-weight:400; font-size:11.5px; color:var(--muted); margin-inline-start:6px}
-.flow table{width:100%; min-width:520px}
+/* ۵۲۰ بود؛ با شش ستون RMF (روزانه و پنج‌روزه برای سه روز) اعداد روی هم
+   می‌افتادند. بهتر است جدول اسکرول افقی بخورد تا خانه‌ها لِه شوند. */
+.flow table{width:100%; min-width:760px}
 /* دو جدول پشت سر هم در یک ناحیهٔ اسکرول: سرسطرِ چسبان این‌جا بیشتر
    گیج می‌کند تا کمک، چون دومی روی اولی می‌نشیند. */
 .flow th{position:static}
-.flow td.bar{width:34%; padding-block:4px}
+.flow td.bar{width:24%; padding-block:4px}
 .flow .bar-wrap{position:relative; height:12px; background:var(--line-soft); border-radius:3px}
 .flow .bar-wrap i{
   position:absolute; top:0; bottom:0; display:block; border-radius:3px;
@@ -215,6 +217,9 @@ button{font:inherit;color:inherit}
 }
 .flow td.rmf, .flow th.rmf{text-align:center; font-variant-numeric:tabular-nums}
 .flow td.rmf{font-size:12px}
+/* مرزِ هر روز. جفتِ «روزانه | پنج‌روزه» با هم یک روز است و این خط
+   می‌گوید کدام جفت به کدام روز. */
+.flow td.grp, .flow th.grp{border-inline-start:1px solid var(--line-soft)}
 #sheet td.pos{color:var(--up)}
 #sheet td.neg{color:var(--down)}
 .flow .pos{color:var(--up)}
@@ -2374,12 +2379,18 @@ const ROW_H = 27;
    «صنایع» که سیزده ستونِ یک صنعت را. پس ستون‌ها و ردیف‌ها تابع‌اند نه
    ثابت، و سرستون هر بار از نو نوشته می‌شود. */
 /* ستون‌های محاسباتیِ RMF — سری ذخیره‌شده نیستند، از ورود پول و ارزش
-   معاملاتِ همان ستون‌ها ساخته می‌شوند. سه افق: پنج‌روزه (موج)،
-   بیست‌ودو‌روزه (ماه معاملاتی) و شصت‌وشش‌روزه (فصل).
+   معاملاتِ همان ستون‌ها ساخته می‌شوند. چهار افق: یک‌روزه (روزانه)،
+   پنج‌روزه (موج)، بیست‌ودو‌روزه (ماه معاملاتی) و شصت‌وشش‌روزه (فصل).
+
+   یک‌روزه همان نسبتِ خامِ همان روز است: ورود پول حقیقیِ روز تقسیم بر
+   ارزش معاملاتِ همان روز. پنجره ندارد، پس پرنوسان است و تنها روزی که
+   داده‌اش ناقص باشد را هم نشان می‌دهد — ولی برای همین، تغییرِ جهت را
+   چند روز زودتر از ۵روزه می‌گوید. کنار هم خواندنشان کارِ اصلی است:
+   اگر روزانه مثبت شده ولی ۵روزه هنوز منفی است، تازه برگشته.
 
    ⚠ در تب صنایع جفتِ خودِ همان صنعت به کار می‌رود، نه جریان کل بازار —
      همان قاعده‌ای که در نمودار هم هست. */
-const RMF_SPANS = [5, 22, 66];
+const RMF_SPANS = [1, 5, 22, 66];
 function rmfCols(pair, tag){
   if(!pair) return [];
   return RMF_SPANS.map(p => ({
@@ -3095,7 +3106,7 @@ function loadInd(code){
   if(indLoaded.has(code)) return Promise.resolve(true);
   if(indBusy===code) return Promise.resolve(false);
   indBusy=code;
-  return fetch(`${IND.dir}/${code}.json?v=${DATA.d[DATA.d.length-1]}`)
+  return fetch(`${IND.dir}/${code}.json?v=${IND.indver || DATA.d[DATA.d.length-1]}`)
     .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
     .then(j=>{
       const idx=j.i||[];
@@ -3286,15 +3297,21 @@ function sumInd(code, i0, i1){
   return {s: n ? s : null, n};
 }
 
-/* RMF-۵ یک صنعت در «آخرین روزِ بازه» و دو روز معاملاتیِ پیش از آن.
+/* RMF یک صنعت در «آخرین روزِ بازه» و دو روز معاملاتیِ پیش از آن، برای
+   هر افقی که خواسته شود (این‌جا روزانه و پنج‌روزه، کنار هم).
 
    ⚠ «روز قبل» یعنی روز معاملاتیِ قبلیِ *همین صنعت*، نه روز تقویمی و نه
      روز بازار: صنعتی که چهارشنبه داده ندارد، روز قبلش سه‌شنبه است.
      ردیف‌ها در flow.json تُنُک‌اند و همین را طبیعی می‌کند.
 
    خروجی: [{v, d}] از تازه به قدیم — v مقدار RMF و d تاریخ همان روز.
-   جایی که پنجرهٔ پنج‌روزه کامل نباشد یا مخرج صفر باشد، null. */
+   جایی که پنجره کامل نباشد یا مخرج صفر باشد، null. */
 const FLOW_RMF_BACK = 3;
+/* افق‌های این جدول، به ترتیبی که در هر روز کنار هم می‌نشینند.
+   روزانه اول می‌آید تا چشم از کوتاه به بلند بخواند، مثل تب جدول. */
+const FLOW_RMF_SPANS = [1, 5];
+/* نامِ هر یک از سه روز، به همان ترتیبِ خروجیِ indRmfRow. */
+const FLOW_RMF_DAYS = ["روز آخرِ بازه", "یک روز قبل", "دو روز قبل"];
 function indRmfAt(code, i1, span){
   const o = FLOW && FLOW[code];
   const out = [];
@@ -3315,6 +3332,25 @@ function indRmfAt(code, i1, span){
   return out;
 }
 
+/* همان چیز، ولی چند افق با هم و گروه‌بندی‌شده بر اساس روز:
+   [{d, vs:[روزانه, پنج‌روزه]}] از تازه به قدیم.
+
+   زیپ‌کردن بر اساس جای k درست است چون هر دو افق از همان ردیف‌های همان
+   صنعت و همان `last` شروع می‌کنند؛ پس خانهٔ k در هر دو یک روز است.
+   تاریخ را از اولین افقی می‌گیریم که دارد: روزانه از روز اول جواب دارد
+   ولی پنج‌روزه تا پنج ردیف جمع نشود null است، و برعکسش پیش نمی‌آید. */
+function indRmfRow(code, i1){
+  const cols = FLOW_RMF_SPANS.map(s => indRmfAt(code, i1, s));
+  const out = [];
+  for(let k=0;k<FLOW_RMF_BACK;k++){
+    out.push({
+      d: cols.map(c => c[k] && c[k].d).find(Boolean) || null,
+      vs: cols.map(c => c[k] ? c[k].v : null),
+    });
+  }
+  return out;
+}
+
 const flowSign = v => v==null ? "" : (v > 0 ? "pos" : (v < 0 ? "neg" : ""));
 
 function flowBig(v){
@@ -3328,7 +3364,9 @@ function ensureFlow(){
   if(!IND.flow){ flowState = "error"; flowErrMsg = "فهرست صنایع در این نسخه نیست."; renderFlow(); return; }
   flowState = "loading";
   renderFlow();
-  fetch(`${IND.flow}?v=${DATA.d[N-1]}`)
+  /* نسخه از محتوای خودِ فایل می‌آید نه از آخرین روز — وگرنه روزی که
+     قالب فایل عوض شود ولی تاریخ نه، کشِ مرورگر فایل کهنه را می‌دهد. */
+  fetch(`${IND.flow}?v=${IND.flowver || DATA.d[N-1]}`)
     .then(r => { if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
     .then(j => { FLOW = j; flowState = "ready"; renderFlow(); })
     .catch(e => { flowState = "error"; flowErrMsg = e.message; renderFlow(); });
@@ -3377,7 +3415,7 @@ function renderFlow(){
   const all = IND.codes.map(c => {
     const code = String(c.c);
     const {s, n} = sumInd(code, i0, i1);
-    return {c:code, n:c.n, s, days:n, rmf:indRmfAt(code, i1, 5)};
+    return {c:code, n:c.n, s, days:n, rmf:indRmfRow(code, i1)};
   }).filter(r => r.s != null);
 
   flowTables.innerHTML =
@@ -3409,11 +3447,21 @@ function flowTable(title, rows, full){
       <td class="${short ? "none" : ""}"${short
         ? ` title="فقط ${fmt(r.days,0)} روز از ${fmt(full,0)} روزِ بازه داده دارد."` : ""
         }>${fmt(r.days,0)}</td>`
-      + (r.rmf.length ? r.rmf : [{v:null},{v:null},{v:null}]).map(x =>
-          x.v==null
-            ? '<td class="none">—</td>'
-            : `<td class="rmf ${flowSign(x.v)}"${x.d
-                ? ` title="${jDate(x.d)}"` : ""}>${nice(x.v,1)}</td>`
+      /* هر روز، یک خانه به ازای هر افق. اگر صنعتی ردیفی در این بازه
+         نداشته باشد r.rmf خالی است و باید همان تعداد خانهٔ تهی بگذاریم،
+         وگرنه ردیف از جدول کوتاه‌تر می‌شود و ستون‌ها می‌لغزند. */
+      + (r.rmf.length ? r.rmf
+          : Array.from({length: FLOW_RMF_BACK},
+                       () => ({d:null, vs: FLOW_RMF_SPANS.map(()=>null)}))
+        /* `grp` خطِ نازکی پیش از هر روزِ تازه می‌کشد. شش عددِ هم‌شکل
+           پشت سر هم بی آن خوانا نیست: معلوم نمی‌شود کدام جفت به کدام
+           روز است. */
+        ).map((x, k) => x.vs.map((v, j) =>
+            v==null
+              ? `<td class="none${k && !j ? " grp" : ""}">—</td>`
+              : `<td class="rmf ${flowSign(v)}${k && !j ? " grp" : ""}"${x.d
+                  ? ` title="${jDate(x.d)}"` : ""}>${nice(v,1)}</td>`
+          ).join("")
         ).join("")
       + `</tr>`;
   }).join("");
@@ -3423,9 +3471,10 @@ function flowTable(title, rows, full){
         <th>مجموع ورود پول حقیقی<span class="unit">میلیارد تومان</span></th>
         <th>اندازه نسبت به بزرگ‌ترینِ همین بخش</th>
         <th>روز داده<span class="unit">از ${fmt(full,0)} روز بازه</span></th>
-        <th class="rmf">RMF-۵<span class="unit">روز آخرِ بازه</span></th>
-        <th class="rmf">RMF-۵<span class="unit">یک روز قبل</span></th>
-        <th class="rmf">RMF-۵<span class="unit">دو روز قبل</span></th>
+        ${FLOW_RMF_DAYS.map((day, k) => FLOW_RMF_SPANS.map((p, j) =>
+            `<th class="rmf${k && !j ? " grp" : ""}">RMF-${pnum(p)}`
+            + `<span class="unit">${day}</span></th>`
+          ).join("")).join("")}
       </tr></thead><tbody>${body}</tbody></table>`;
 }
 
@@ -3453,22 +3502,31 @@ flowCsvBtn.addEventListener("click", () => {
   const R = flowRange();
   if(!R.ok) return;
   const {i0, i1} = R;
+  /* سرستون و ردیف‌ها از همان دو ثابتِ جدول ساخته می‌شوند، تا اگر افقی
+     کم یا زیاد شد CSV و جدول از هم در نروند. هر روز: یک ستون به ازای
+     هر افق، و در آخرِ همان روز یک ستون تاریخ. */
+  const DAY_EN = ["روز آخر", "یک روز قبل", "دو روز قبل"];
+  const head = FLOW_RMF_DAYS.map((_, k) =>
+    FLOW_RMF_SPANS.map(p => `RMF-${p} ${DAY_EN[k]}`).concat(`تاریخ ${DAY_EN[k]}`)
+      .join(",")).join(",");
+  const blanks = ",".repeat(FLOW_RMF_DAYS.length * (FLOW_RMF_SPANS.length + 1));
   const lines = ["بخش,نام,مجموع ورود پول حقیقی (میلیارد تومان),روز داده,"
-                 + "RMF-5 روز آخر,تاریخ,RMF-5 یک روز قبل,تاریخ,"
-                 + "RMF-5 دو روز قبل,تاریخ"];
+                 + head];
   for(const m of FLOW_MARKET){
     const {s, n} = sumSeries(DATA[m.k], i0, i1);
-    lines.push(`کل بازار,${m.n},${s==null?"":s.toFixed(1)},${n},,,,,,`);
+    lines.push(`کل بازار,${m.n},${s==null?"":s.toFixed(1)},${n}${blanks}`);
   }
   if(flowState === "ready"){
     for(const c of IND.codes){
       const code = String(c.c);
       const {s, n} = sumInd(code, i0, i1);
       if(s == null) continue;
-      const rm = indRmfAt(code, i1, 5);
-      const tail = [0,1,2].map(k => {
+      const rm = indRmfRow(code, i1);
+      const tail = FLOW_RMF_DAYS.map((_, k) => {
         const x = rm[k];
-        return `${x && x.v!=null ? x.v.toFixed(1) : ""},${x && x.d ? x.d : ""}`;
+        const vs = FLOW_RMF_SPANS.map((_p, j) =>
+          x && x.vs[j] != null ? x.vs[j].toFixed(1) : "");
+        return vs.concat(x && x.d ? x.d : "").join(",");
       }).join(",");
       lines.push(`${isFundCode(c.c) ? "صندوق‌ها" : "صنایع"},${c.n},`
                  + `${s.toFixed(1)},${n},${tail}`);
